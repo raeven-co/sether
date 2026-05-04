@@ -1,0 +1,76 @@
+{
+  "name": "@raeven/sether",
+  "version": "0.1.0-alpha.0",
+  "description": "Streaming PII redaction for AI applications. The hiding place for sensitive data flowing into LLMs.",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src test --max-warnings 0",
+    "check:regex": "node scripts/check-regex-safety.mjs",
+    "format": "prettier --write src test",
+    "format:check": "prettier --check src test",
+    "prepublishOnly": "npm run typecheck && npm run lint && npm run check:regex && npm test && npm run build"
+  },
+  "keywords": [
+    "ai",
+    "security",
+    "pii",
+    "redaction",
+    "stream",
+    "llm",
+    "privacy",
+    "gdpr",
+    "hipaa",
+    "compliance",
+    "openai",
+    "anthropic"
+  ],
+  "author": "Godfrey Lebo <godfrey@raeven.co> (Raeven, Inc.)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/raeven-co/sether.git"
+  },
+  "homepage": "https://sether.ai",
+  "bugs": {
+    "url": "https://github.com/raeven-co/sether/issues"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "libphonenumber-js": "^1.11.20"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.18.0",
+    "@types/node": "^22.10.0",
+    "eslint": "^9.18.0",
+    "fast-check": "^3.23.0",
+    "prettier": "^3.4.0",
+    "safe-regex2": "^4.0.0",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.0",
+    "typescript-eslint": "^8.20.0",
+    "vitest": "^2.1.8"
+  }
+}
