@@ -74,7 +74,10 @@ export const ssnDetector: Detector = {
 };
 
 const IPV4_OCTET = '(25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)';
-const IPV4_RE = new RegExp(`\\b${IPV4_OCTET}\\.${IPV4_OCTET}\\.${IPV4_OCTET}\\.${IPV4_OCTET}\\b`, 'g');
+const IPV4_RE = new RegExp(
+  `\\b${IPV4_OCTET}\\.${IPV4_OCTET}\\.${IPV4_OCTET}\\.${IPV4_OCTET}\\b`,
+  'g',
+);
 
 export const ipv4Detector: Detector = {
   type: 'IPV4',

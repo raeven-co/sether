@@ -31,7 +31,10 @@ describe('Sether streaming', () => {
 
   it('handles PII split across chunks (the v1 critical bug)', async () => {
     const sether = new Sether();
-    const chunks = ['my email is foo@', 'bar.com today, more text to push past the safe distance buffer. '.repeat(10)];
+    const chunks = [
+      'my email is foo@',
+      'bar.com today, more text to push past the safe distance buffer. '.repeat(10),
+    ];
     const input = Readable.from(chunks);
     const result = await streamToString(input.pipe(sether.redact()));
     expect(result).not.toContain('foo@bar.com');
