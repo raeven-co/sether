@@ -58,6 +58,13 @@ describe('creditCardDetector (Luhn)', () => {
     const m = creditCardDetector.detect('Call 555-123-4567');
     expect(m).toHaveLength(0);
   });
+
+  it('does not eat the leading space before the card', () => {
+    const m = creditCardDetector.detect('paid with 4532015112830366 today');
+    expect(m).toHaveLength(1);
+    expect(m[0]?.value).toBe('4532015112830366');
+    expect(m[0]?.value.startsWith(' ')).toBe(false);
+  });
 });
 
 describe('ssnDetector', () => {
