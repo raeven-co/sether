@@ -1,6 +1,35 @@
 # Changelog
 
-## 0.1.0-alpha — 2026-04-25 → 2026-05-02
+## 0.1.0-alpha.1 — 2026-05-04
+
+Documentation + minor detector fixes. No breaking API changes.
+
+### Fixed
+
+- **Credit-card regex** no longer eats the leading space before a card
+  number. The previous regex `\b[\d -]{13,23}` allowed the match to start
+  with a space (since space is in the character class and `\b` permitted
+  the transition). New regex `\b\d[\d -]{12,22}` requires the first
+  matched character to be a digit. Functionally equivalent (Luhn check
+  was always the source of truth) but makes redacted output read cleanly
+  ("paid with `<CC_...>` from" instead of "paid with`<CC_...>` from").
+  Added a regression test.
+
+### Documentation
+
+- README tagline updated from *"...before it ships to OpenAI / Anthropic"*
+  to *"...before it ships to any LLM provider"* — reflects that the OSS
+  is provider-agnostic. Added an explicit "Works with" section listing
+  OpenAI, Anthropic, Cohere, Mistral, Gemini, Bedrock, Azure OpenAI,
+  Together, Groq, Ollama, and self-hosted fine-tunes.
+- `package.json` `homepage` field temporarily points to the live Vercel
+  preview URL until the `sether.ai` domain is registered.
+
+### Migration
+
+None — fully backward-compatible with `0.1.0-alpha.0`.
+
+## 0.1.0-alpha.0 — 2026-04-25 → 2026-05-02
 
 Initial alpha. Successor to `redact-ai-stream` 1.x. Pre-release; API may
 change before 1.0.

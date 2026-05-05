@@ -12,8 +12,9 @@ export const emailDetector: Detector = {
 };
 
 // Bounded character class — no nested quantifier, no ReDoS surface.
-// Matches digits with optional space/dash separators; validated by Luhn.
-const CC_RE = /\b[\d -]{13,23}/g;
+// First char must be a digit (no leading space/dash eaten); remaining 12-22
+// chars can be digits, spaces, or dashes. Validated by Luhn after match.
+const CC_RE = /\b\d[\d -]{12,22}/g;
 
 export const creditCardDetector: Detector = {
   type: 'CC',

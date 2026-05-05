@@ -1,6 +1,6 @@
 # Sether
 
-> **Hides personal data from your AI before it ships to OpenAI / Anthropic.**
+> **Hides personal data from your AI before it ships to any LLM provider.**
 >
 > Named for the Hebrew *sether* (סֵתֶר) — the hiding place. Psalm 32:7.
 
@@ -9,16 +9,23 @@ sensitive data, replaces it with stable tokens before requests leave your
 boundary, restores tokens transparently in the response. Three lines of
 TypeScript.
 
+**Works with:** OpenAI, Anthropic, Cohere, Mistral, Google Gemini, AWS
+Bedrock, Azure OpenAI, Together, Groq, Ollama, your own fine-tunes — or
+any HTTP-based LLM API. Sether reads text streams; it doesn't care who's
+on the other end.
+
 **Status: `0.1.0-alpha`** — pre-release. API may change before 1.0.
 
 A product of [Raeven, Inc.](https://raeven.co).
 
 ## What it solves
 
-If your app sends a customer email to OpenAI, that's a [GDPR Article 28](https://gdpr-info.eu/art-28-gdpr/)
-sub-processor exposure. Credit cards trigger PCI DSS scope. Health-related
-identifiers trigger HIPAA. The first GDPR enforcement actions tied to AI
-flows started landing in 2025; the EU AI Act phases in through 2026-2027.
+If your app sends a customer email to *any* LLM provider — OpenAI,
+Anthropic, your own fine-tune hosted on Bedrock, doesn't matter — that's
+a [GDPR Article 28](https://gdpr-info.eu/art-28-gdpr/) sub-processor
+exposure. Credit cards trigger PCI DSS scope. Health-related identifiers
+trigger HIPAA. The first GDPR enforcement actions tied to AI flows started
+landing in 2025; the EU AI Act phases in through 2026-2027.
 
 Sether intercepts these before they leave your infrastructure, logs every
 redaction event with the specific regulation it satisfies, and restores
