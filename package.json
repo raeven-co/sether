@@ -1,5 +1,5 @@
 {
-  "name": "@raeven/sether",
+  "name": "@raeven-co/sether",
   "version": "0.1.0-alpha.0",
   "description": "Streaming PII redaction for AI applications. The hiding place for sensitive data flowing into LLMs.",
   "type": "module",

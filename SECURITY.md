@@ -15,7 +15,7 @@ GitHub's private security advisories are also acceptable: navigate to the
 
 - A description of the vulnerability
 - Steps to reproduce, or a proof-of-concept if you have one
-- The affected version(s) of `@raeven/sether`
+- The affected version(s) of `@raeven-co/sether`
 - Any suggested mitigation if you have one
 - Your name / handle if you'd like to be credited (optional)
 
@@ -32,7 +32,7 @@ credit valid reporters in our changelog and security advisories.
 
 ## What's in scope
 
-- The `@raeven/sether` npm package and its dependencies
+- The `@raeven-co/sether` npm package and its dependencies
 - The detection regex patterns and validation logic
 - The streaming Transform implementation
 - The token vault interface and `MemoryVault` reference implementation
@@ -50,7 +50,7 @@ credit valid reporters in our changelog and security advisories.
 | Version | Supported |
 |---|---|
 | 0.1.x (alpha) | ✓ Yes — we'll patch security issues during alpha |
-| < 0.1.0 (legacy `redact-ai-stream`) | ✗ No — please upgrade to `@raeven/sether` |
+| < 0.1.0 (legacy `redact-ai-stream`) | ✗ No — please upgrade to `@raeven-co/sether` |
 
 Once `1.0.0` ships, we'll commit to supporting the current major version
 and one previous major.

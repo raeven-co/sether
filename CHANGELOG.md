@@ -12,7 +12,7 @@ change before 1.0.
   still detected. Property-based tests prove redact↔restore identity over
   arbitrary chunk partitions (50+ random runs per CI).
 - **Detector framework** with pluggable detector packs.
-- **Basic detector pack** (`@raeven/sether/detectors/basic`):
+- **Basic detector pack** (`@raeven-co/sether/detectors/basic`):
   - `EMAIL` — RFC 5321-style regex (ASCII-only)
   - `PHONE` — libphonenumber-js for international parsing
   - `CC` — bounded regex with Luhn validation; ReDoS-safe

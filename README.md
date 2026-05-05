@@ -59,13 +59,13 @@ tokens transparently in the response.
 ## Install
 
 ```bash
-npm install @raeven/sether
+npm install @raeven-co/sether
 ```
 
 ## Quick start (stream API)
 
 ```ts
-import { Sether } from '@raeven/sether';
+import { Sether } from '@raeven-co/sether';
 import { Readable } from 'node:stream';
 
 const sether = new Sether();
@@ -84,7 +84,7 @@ const safeForUser = llmResponse.pipe(sether.restore());
 ## Choose specific detectors
 
 ```ts
-import { Sether, emailDetector, ssnDetector } from '@raeven/sether';
+import { Sether, emailDetector, ssnDetector } from '@raeven-co/sether';
 
 // Only redact email + SSN; leave other PII alone
 const sether = new Sether({
@@ -95,7 +95,7 @@ const sether = new Sether({
 ## Custom vault (persistence beyond in-memory)
 
 ```ts
-import { Sether, type Vault } from '@raeven/sether';
+import { Sether, type Vault } from '@raeven-co/sether';
 
 class RedisVault implements Vault {
   // implement set / get / has / delete / size / clear backed by Redis
