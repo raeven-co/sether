@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.1.0-alpha.2 — 2026-05-11
+
+Documentation pass. No code changes — fully API-compatible with `0.1.0-alpha.1`.
+
+### Changed
+
+- **README rewritten for clarity.** Restructured around: *why → install →
+  60-second quickstart → built-in detectors → vault → streaming safety →
+  limitations → roadmap*. Added an end-to-end round-trip example showing
+  `redact → restore` identity in one snippet.
+- **Live sandbox link added at the top of the README** — readers can paste
+  text and see redaction in their browser before installing. The sandbox
+  runs the same detection engine; production users install the package.
+- **Stat corrections.** README previously claimed *46 tests* and *22
+  regex patterns* — actual numbers are *47 tests* and *21 patterns*
+  (verified by `npm test` and `npm run check:regex` in CI).
+
+### Updated URLs
+
+- `package.json` `homepage` now points to
+  <https://sether.raevenmarket.com.ng> (primary marketing domain).
+  <https://setherai.vercel.app> remains live as a mirror.
+- README, SECURITY policy, and changelog link the same pair of URLs.
+
+### Migration notes
+
+None — fully backward-compatible.
+
 ## 0.1.0-alpha.1 — 2026-05-04
 
 Documentation + minor detector fixes. No breaking API changes.

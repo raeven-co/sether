@@ -40,7 +40,7 @@ credit valid reporters in our changelog and security advisories.
 ## What's out of scope (handled separately)
 
 - The Sether hosted SaaS gateway (report via the SaaS dashboard or `security@raeven.co`)
-- The marketing site at `sether.ai`
+- The marketing site at <https://sether.raevenmarket.com.ng> and its mirror at <https://setherai.vercel.app>
 - Issues in upstream dependencies that we don't directly own
 - Issues that require physical access to a user's machine
 - Theoretical vulnerabilities without a working proof-of-concept
