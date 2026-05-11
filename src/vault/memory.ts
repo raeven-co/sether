@@ -53,6 +53,12 @@ export class MemoryVault implements Vault {
   }
 
   size(): number {
+    const now = Date.now();
+    for (const [key, entry] of this.#store) {
+      if (entry.expiresAt < now) {
+        this.#store.delete(key);
+      }
+    }
     return this.#store.size;
   }
 

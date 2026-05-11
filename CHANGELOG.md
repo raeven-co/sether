@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.1.0 — 2026-05-11
+
+First stable release. API is now locked; no breaking changes before 1.0.
+
+### Changed
+
+- Version promoted from `0.1.0-alpha.2` to `0.1.0` — tagged `latest` on npm.
+  `npm install @raeven-co/sether` now installs this release without `@alpha`.
+- `homepage` in `package.json` updated to <https://setherai.vercel.app>.
+- README status updated from pre-release to stable; duplicate/stale URLs removed.
+
+### Fixed
+
+- **`MemoryVault.size()` now prunes expired entries before counting.** Previously
+  the raw `Map.size` was returned, which included TTL-expired entries that had
+  not yet been lazily evicted. This inflated the reported count and could
+  trigger premature LRU eviction of valid entries when close to `maxEntries`.
+
+### Migration
+
+None — fully backward-compatible with `0.1.0-alpha.2`.
+
+---
+
 ## 0.1.0-alpha.2 — 2026-05-11
 
 Documentation pass. No code changes — fully API-compatible with `0.1.0-alpha.1`.

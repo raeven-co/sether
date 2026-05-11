@@ -25,7 +25,7 @@ Groq, Ollama**, your own fine-tunes — anything that speaks HTTP and
 streams text. Sether doesn't care who's on the other end; it operates on
 the text stream.
 
-**Status:** `0.1.0-alpha.2` — pre-release. API may change before 1.0.
+**Status:** `0.1.0` — stable release.
 A product of **[Raeven, Inc.](https://raeven.co)**
 
 ---
@@ -50,11 +50,9 @@ so your application code doesn't change.
 The live sandbox runs the same detection engine in your browser — paste
 any text, watch the PII tokens get swapped in real time:
 
-- **Marketing site + live sandbox:** <https://sether.raevenmarket.com.ng>
-- **Mirror (Vercel):** <https://setherai.vercel.app>
+- **Live sandbox:** <https://setherai.vercel.app>
 
-The sandbox is a browser-only subset of `@raeven-co/sether` for
-demonstration. For production, install the package below.
+The sandbox is a browser-only demonstration of `@raeven-co/sether`. For production, install the package below.
 
 ---
 
@@ -136,7 +134,7 @@ const sether = new Sether({
 });
 ```
 
-### Built-in detectors (0.1.0-alpha)
+### Built-in detectors (0.1.0)
 
 | Detector | Method | Notes |
 | --- | --- | --- |
@@ -230,7 +228,7 @@ const sether = new Sether({ safeDistanceBytes: 1024 });
 
 ## Honest limitations
 
-This is alpha software. Read before deploying:
+Known limitations in this release:
 
 - **Email detection is ASCII-only.** IDN/Unicode local parts won't match. Fix lands in 0.2.
 - **IPv6 `::1` (loopback) is not detected.** Candidate regex requires 4+ chars. Loopback isn't customer PII, but flag it in your audit logs if it matters for your threat model.
@@ -283,8 +281,7 @@ Email `security@raeven.co` (or `godfrey@raeven.co` as a backup).
 
 ## Links
 
-- **Live sandbox:** <https://sether.raevenmarket.com.ng>
-- **Mirror:** <https://setherai.vercel.app>
+- **Live sandbox:** <https://setherai.vercel.app>
 - **GitHub:** <https://github.com/raeven-co/sether>
 - **npm:** <https://www.npmjs.com/package/@raeven-co/sether>
 - **Issues:** <https://github.com/raeven-co/sether/issues>

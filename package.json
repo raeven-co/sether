@@ -1,6 +1,6 @@
 {
   "name": "@raeven-co/sether",
-  "version": "0.1.0-alpha.2",
+  "version": "0.1.0",
   "description": "Streaming PII redaction for AI applications. The hiding place for sensitive data flowing into LLMs.",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -51,7 +51,7 @@
     "type": "git",
     "url": "git+https://github.com/raeven-co/sether.git"
   },
-  "homepage": "https://sether.raevenmarket.com.ng",
+  "homepage": "https://setherai.vercel.app",
   "bugs": {
     "url": "https://github.com/raeven-co/sether/issues"
   },
