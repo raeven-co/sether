@@ -25,7 +25,7 @@ Groq, Ollama**, your own fine-tunes — anything that speaks HTTP and
 streams text. Sether doesn't care who's on the other end; it operates on
 the text stream.
 
-**Status:** `0.1.0` — stable release.
+**Status:** `0.1.2` — stable release.
 A product of **[Raeven, Inc.](https://raeven.co)**
 
 ---
@@ -39,9 +39,12 @@ pulls you into PCI DSS scope. Health identifiers trigger HIPAA. The first
 GDPR enforcement actions tied to AI flows landed in 2025, and the EU AI
 Act phases in through 2026–2027.
 
-Sether stops the leak at the boundary, logs every redaction event against
-the specific regulation it satisfies, and restores tokens transparently
-so your application code doesn't change.
+Sether stops the leak at the boundary: sensitive substrings become stable
+tokens before the bytes leave your process, and `restore()` swaps them back
+so your application code does not need to branch on redacted text.
+Automated per-event regulation tagging and SIEM export are on the **Pro /
+hosted roadmap** (see *What's coming* below) — the npm library focuses on
+deterministic streaming redaction today.
 
 ---
 
@@ -50,7 +53,7 @@ so your application code doesn't change.
 The live sandbox runs the same detection engine in your browser — paste
 any text, watch the PII tokens get swapped in real time:
 
-- **Live sandbox:** <https://setherai.vercel.app>
+- **Live sandbox:** <https://setherai.vercel.app/#sandbox>
 
 The sandbox is a browser-only demonstration of `@raeven-co/sether`. For production, install the package below.
 
@@ -134,7 +137,7 @@ const sether = new Sether({
 });
 ```
 
-### Built-in detectors (0.1.0)
+### Built-in detectors (0.1.x)
 
 | Detector | Method | Notes |
 | --- | --- | --- |
@@ -190,8 +193,10 @@ class RedisVault implements Vault {
 }
 ```
 
-The vault stays in **your** infrastructure. Sether's gateway (when used)
-never persists the original PII.
+The vault stays in **your** process (or your own backing store if you
+implement `Vault`). **This package does not phone home** — streams are not
+sent to Raeven. A future optional hosted gateway will be documented
+separately.
 
 ---
 
@@ -281,7 +286,7 @@ Email `security@raeven.co` (or `godfrey@raeven.co` as a backup).
 
 ## Links
 
-- **Live sandbox:** <https://setherai.vercel.app>
+- **Live sandbox:** <https://setherai.vercel.app/#sandbox>
 - **GitHub:** <https://github.com/raeven-co/sether>
 - **npm:** <https://www.npmjs.com/package/@raeven-co/sether>
 - **Issues:** <https://github.com/raeven-co/sether/issues>

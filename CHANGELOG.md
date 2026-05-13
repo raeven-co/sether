@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.1.2 — 2026-05-13
+
+Patch release: documentation accuracy for npm readers; no API or runtime changes.
+
+### Fixed
+
+- **README** “Why this exists” no longer states that the OSS library logs every
+  redaction against specific regulations — that belongs to the Pro / hosted
+  roadmap. The library’s scope is streaming redact / restore in your process.
+
+### Changed
+
+- **README** token-vault section: clarifies that this package does not send streams
+  to Raeven; removes wording that implied a gateway ships in this release.
+
+---
+
+## 0.1.1 — 2026-05-13
+
+Patch release: documentation and marketing alignment; no breaking API changes.
+
+### Changed
+
+- `package.json` `homepage` now includes the live marketing sandbox fragment:
+  <https://setherai.vercel.app/#sandbox>.
+
+### Notes
+
+- Runtime behaviour matches `0.1.0`. Upgrade is safe for all existing integrations.
+
+---
+
 ## 0.1.0 — 2026-05-11
 
 First stable release. API is now locked; no breaking changes before 1.0.
