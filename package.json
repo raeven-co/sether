@@ -1,8 +1,9 @@
 {
   "name": "@raeven-co/sether",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Streaming PII redaction for AI applications. The hiding place for sensitive data flowing into LLMs.",
   "type": "module",
+  "sideEffects": false,
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -53,7 +54,12 @@
   },
   "homepage": "https://setherai.vercel.app/#sandbox",
   "bugs": {
-    "url": "https://github.com/raeven-co/sether/issues"
+    "url": "https://github.com/raeven-co/sether/issues",
+    "email": "security@raeven.co"
+  },
+  "funding": {
+    "type": "github",
+    "url": "https://github.com/sponsors/emorilebo"
   },
   "engines": {
     "node": ">=18"

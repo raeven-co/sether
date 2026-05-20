@@ -1,6 +1,65 @@
-import { isIPv6 } from 'node:net';
 import { findPhoneNumbersInText } from 'libphonenumber-js';
 import type { Detector, DetectorMatch } from './types.js';
+
+// In-tree IPv6 validator — equivalent to Node's `net.isIPv6` for the
+// hex+colon-only candidates produced by IPV6_CANDIDATE below.
+// Avoids importing `node:net` so the bundled package surfaces no
+// network-capable module to supply-chain scanners.
+// Equivalence is proven by the property-based test in
+// test/ipv6.equivalence.test.ts (fuzzed against Node's net.isIPv6).
+// Exported for test access only — not re-exported from `src/index.ts`,
+// so this stays out of the published public API surface.
+export function isIPv6Address(input: string): boolean {
+  const len = input.length;
+  if (len === 0 || len > 45) return false;
+
+  // Only hex digits (0-9, a-f, A-F) and ':' permitted. IPv4-in-IPv6
+  // mixed form (which contains '.') is intentionally NOT handled here —
+  // the candidate regex excludes it and the existing detector documents
+  // the limitation.
+  for (let i = 0; i < len; i++) {
+    const c = input.charCodeAt(i);
+    const isHex =
+      (c >= 48 && c <= 57) || // 0-9
+      (c >= 65 && c <= 70) || // A-F
+      (c >= 97 && c <= 102); // a-f
+    if (!isHex && c !== 58 /* ':' */) return false;
+  }
+
+  // At most one '::' allowed.
+  const firstDoubleColon = input.indexOf('::');
+  if (firstDoubleColon !== -1 && input.indexOf('::', firstDoubleColon + 1) !== -1) {
+    return false;
+  }
+
+  if (firstDoubleColon !== -1) {
+    // Compressed form: split on the (single) '::'. Each side is a
+    // (possibly empty) colon-separated list of 1-4-char hex groups,
+    // and the combined group count must be < 8 (the '::' fills the gap).
+    const left = input.slice(0, firstDoubleColon);
+    const right = input.slice(firstDoubleColon + 2);
+    const leftGroups = left === '' ? [] : left.split(':');
+    const rightGroups = right === '' ? [] : right.split(':');
+    for (let i = 0; i < leftGroups.length; i++) {
+      const g = leftGroups[i] as string;
+      if (g.length < 1 || g.length > 4) return false;
+    }
+    for (let i = 0; i < rightGroups.length; i++) {
+      const g = rightGroups[i] as string;
+      if (g.length < 1 || g.length > 4) return false;
+    }
+    return leftGroups.length + rightGroups.length < 8;
+  }
+
+  // Uncompressed form: exactly 8 hex groups of 1-4 chars each.
+  const groups = input.split(':');
+  if (groups.length !== 8) return false;
+  for (let i = 0; i < 8; i++) {
+    const g = groups[i] as string;
+    if (g.length < 1 || g.length > 4) return false;
+  }
+  return true;
+}
 
 const EMAIL_RE = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g;
 
@@ -100,7 +159,7 @@ export const ipv6Detector: Detector = {
     while ((m = IPV6_CANDIDATE.exec(text)) !== null) {
       const candidate = m[0];
       if (!candidate.includes(':')) continue;
-      if (!isIPv6(candidate)) continue;
+      if (!isIPv6Address(candidate)) continue;
       matches.push({ start: m.index, end: m.index + candidate.length, value: candidate });
     }
     return matches;

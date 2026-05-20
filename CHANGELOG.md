@@ -1,5 +1,47 @@
 # Changelog
 
+## 0.1.3 — 2026-05-16
+
+Patch release: supply-chain hardening. No public API change, no behavior
+change for any consumer. Drop-in safe upgrade from 0.1.2.
+
+### Changed
+
+- **IPv6 validator brought in-tree.** Replaced the single `import { isIPv6 }
+  from 'node:net'` in `src/detectors/basic.ts` with an equivalent in-tree
+  validator. The previous import caused supply-chain scanners (e.g.
+  Socket.dev) to flag the published bundle as "accesses the network,"
+  even though `net.isIPv6` is a pure synchronous string validator and
+  no socket is ever opened. The new validator removes the `require('net')`
+  line from the published `dist/index.cjs` entirely.
+- **Equivalence proven by property-based tests.** Added
+  `test/ipv6.equivalence.test.ts`: 5 tests including two property-based
+  fuzz runs that compare the new validator against Node's `net.isIPv6`
+  across **6000+ randomly generated inputs** (hex+colon strings and
+  fully random Unicode strings). Tests pass — behavior is provably
+  identical to Node's implementation for the candidate domain the IPv6
+  detector operates on.
+- **`sideEffects: false`** declared in `package.json` — explicit
+  tree-shaking signal for bundlers; no side effects on import.
+- **`funding` field** added pointing at GitHub Sponsors.
+- **`bugs.email`** added (`security@raeven.co`) so vulnerability
+  reporters can find the right inbox quickly.
+
+### Build & test surface
+
+- Tests: **52 passing** (up from 47 — 5 new equivalence tests).
+- Build size: CJS 11.78 KB, ESM 11.47 KB (+~1.2 KB each for the inline
+  validator — fair trade for removing a flagged dependency).
+- ReDoS scan: 23 patterns, 0 unsafe (was 21 — new patterns are bounded
+  character classes in the validator).
+
+### Migration
+
+None. Public API is unchanged. The `IPV6` detector continues to match
+exactly the same set of inputs it matched in 0.1.x.
+
+---
+
 ## 0.1.2 — 2026-05-13
 
 Patch release: documentation accuracy for npm readers; no API or runtime changes.
