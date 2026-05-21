@@ -25,7 +25,7 @@ Groq, Ollama**, your own fine-tunes — anything that speaks HTTP and
 streams text. Sether doesn't care who's on the other end; it operates on
 the text stream.
 
-**Status:** `0.1.2` — stable release.
+**Status:** `0.2.0` — secrets pack, SSE/JSON-stream mode, audit events, and drop-in middlewares for Express / fetch / OpenAI / Anthropic.
 A product of **[Raeven, Inc.](https://raeven.co)**
 
 ---
@@ -243,15 +243,93 @@ Known limitations in this release:
 
 ---
 
-## What's coming (0.2 / Pro tier)
+## What's new in 0.2.0
 
-- Secrets detector pack — AWS / OpenAI / Anthropic / GitHub / Slack / Stripe keys, JWTs, high-entropy strings
-- NER detectors — names, organisations, addresses
-- Drop-in middlewares — Express, fetch wrapper, OpenAI/Anthropic SDK wrappers
-- JSON-stream mode — SSE-aware tokenisation for LLM streaming responses
-- Pluggable vault backends — Redis, Postgres adapters
-- Compliance reports mapped to SOC 2 / GDPR / HIPAA controls (Pro hosted tier)
-- Audit log persistence + SIEM export (Pro hosted tier)
+Most of the original 0.2 wishlist shipped in this release. **No breaking changes.** Drop-in upgrade from 0.1.x.
+
+### Secrets detector pack (`secretsDetectors`)
+
+Eight new detectors for the credential classes engineers most often leak into prompts:
+
+```ts
+import { Sether, basicDetectors, secretsDetectors } from '@raeven-co/sether';
+
+const sether = new Sether({
+  detectors: [...basicDetectors, ...secretsDetectors],
+});
+```
+
+Detectors: `awsAccessKeyDetector`, `openaiKeyDetector`, `anthropicKeyDetector`, `githubPatDetector` (classic + fine-grained), `slackTokenDetector`, `stripeKeyDetector` (live/test/webhook), `jwtDetector`, `highEntropyDetector` (Shannon entropy ≥ 3.5 bits/char).
+
+### SSE / JSON-stream mode
+
+OpenAI / Anthropic streaming responses come back as Server-Sent Events. The SSE-aware stream redacts payloads inside `data:` lines while preserving the `data:` / `event:` / `id:` / `retry:` framing and blank-line separators verbatim.
+
+```ts
+import { createSSERedactStream, basicDetectors, MemoryVault } from '@raeven-co/sether';
+
+const vault = new MemoryVault();
+openaiResponse.body.pipe(createSSERedactStream({ detectors: basicDetectors, vault }));
+```
+
+### Drop-in middlewares
+
+Four ways to wire Sether into an existing app without rewriting handlers:
+
+```ts
+// Generic fetch
+import { wrapFetch } from '@raeven-co/sether';
+const safeFetch = wrapFetch({ detectors: sether.detectors, vault: sether.vault });
+
+// Express
+import express from 'express';
+import { createExpressMiddleware } from '@raeven-co/sether';
+const app = express();
+app.use(express.json());
+app.use(createExpressMiddleware({ detectors: sether.detectors, vault: sether.vault }));
+
+// OpenAI SDK (peer dep — install `openai` separately)
+import OpenAI from 'openai';
+import { wrapOpenAI } from '@raeven-co/sether';
+const openai = wrapOpenAI(new OpenAI({ apiKey }), {
+  detectors: sether.detectors,
+  vault: sether.vault,
+});
+
+// Anthropic SDK (peer dep — install `@anthropic-ai/sdk` separately)
+import Anthropic from '@anthropic-ai/sdk';
+import { wrapAnthropic } from '@raeven-co/sether';
+const anthropic = wrapAnthropic(new Anthropic({ apiKey }), {
+  detectors: sether.detectors,
+  vault: sether.vault,
+});
+```
+
+`openai` and `@anthropic-ai/sdk` are **optional peer dependencies** — users who don't import the wrappers pay zero install cost.
+
+### Audit-event schema
+
+Every redaction can emit a structured `AuditEvent` that maps to the regulation it satisfies (GDPR Art. 28, SOC 2 CC6.7, HIPAA §164.312, PCI DSS, etc. — see `DEFAULT_REGULATION_MAPPINGS`). Ship-ready writers:
+
+```ts
+import { ConsoleAuditSink, MemoryAuditSink, DEFAULT_REGULATION_MAPPINGS } from '@raeven-co/sether';
+```
+
+`ConsoleAuditSink` writes JSONL to stderr. `MemoryAuditSink` accumulates events for tests and the browser sandbox. **The original value is never carried in an event — only its length.** Persistence (Postgres / D1 / SIEM export) lives in the hosted Pro tier; the schema is the same on both sides so promoting from local-only to hosted doesn't reshape events.
+
+### `redactSync(text, { detectors, vault })`
+
+Synchronous one-shot redaction for cases where you have the full text in hand (a JSON field, a log line, an SSE payload) and don't need chunk-boundary buffering. Use `createRedactStream` for input that may span chunk boundaries.
+
+---
+
+## What's coming (0.3 / Pro hosted tier)
+
+- **NER detectors** — names, organisations, addresses. Will ship as a separate `@raeven-co/sether-ner` package to keep the core install lean (avoids ~30 MB native ONNX runtime).
+- **Vault adapters as reference examples** — Redis and Postgres patterns documented in the repo, not bundled (the `Vault` interface already supports BYO).
+- **Compliance reports** mapped to SOC 2 / GDPR / HIPAA controls — Pro hosted tier.
+- **Audit log persistence + SIEM export** — Pro hosted tier.
+- **Benchmarks vs Microsoft Presidio** — alongside the 0.3 NER release.
 
 Track progress: <https://github.com/raeven-co/sether>
 

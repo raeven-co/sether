@@ -1,5 +1,165 @@
 # Changelog
 
+## 0.2.0 — 2026-05-21
+
+Minor release. Major feature expansion. **No breaking changes to the
+0.1.x public API** — every export from 0.1.3 still works the same way.
+
+### Added — Secrets detector pack (`secretsDetectors`)
+
+Eight new detectors covering the most-leaked credential classes in
+real-world AI prompts:
+
+- **`awsAccessKeyDetector`** — `AKIA / ASIA / AROA / AIDA` + 16-char base32 tail
+- **`openaiKeyDetector`** — `sk-` / `sk-proj-` / `sk-svcacct-` / `sk-admin-` formats
+- **`anthropicKeyDetector`** — `sk-ant-api*` / `sk-ant-admin*` published prefixes
+- **`githubPatDetector`** — classic (`ghp_`/`gho_`/`ghu_`/`ghs_`/`ghr_`) + fine-grained (`github_pat_`)
+- **`slackTokenDetector`** — `xox[baprs]-` bot/user/app/refresh/workspace tokens
+- **`stripeKeyDetector`** — live/test `sk_` / `rk_` / `pk_` + `whsec_` webhook secrets
+- **`jwtDetector`** — three-segment base64url header.payload.signature with `eyJ` prefix on both header and payload
+- **`highEntropyDetector`** — 32+ char strings with Shannon entropy ≥ 3.5 bits/char (catches HMAC secrets and internally generated API tokens with no published prefix)
+
+All eight ship as a single `secretsDetectors` array for convenience and
+follow the existing `Detector` interface. All regex literals scanned by
+`safe-regex2` in CI — 0 unsafe across 117 patterns total.
+
+Opt-in by default (the bare `new Sether()` still uses only `basicDetectors`):
+
+```ts
+import { Sether, basicDetectors, secretsDetectors } from '@raeven-co/sether';
+const sether = new Sether({
+  detectors: [...basicDetectors, ...secretsDetectors],
+});
+```
+
+### Added — SSE / JSON-stream mode (`createSSERedactStream`, `createSSERestoreStream`)
+
+The streaming PII redactor finally understands Server-Sent Events. Field
+labels (`data:`, `event:`, `id:`, `retry:`), comment lines, and the
+blank-line event separator pass through verbatim — only `data:` payloads
+are redacted. The mirror restore stream un-tokenises payloads on the
+return path, leaving the SSE frame structure intact.
+
+Round-trip identity proven by tests: any SSE frame → redact → restore
+returns the exact original bytes.
+
+```ts
+import { createSSERedactStream, basicDetectors, MemoryVault } from '@raeven-co/sether';
+const vault = new MemoryVault();
+openaiResponse.body.pipe(createSSERedactStream({ detectors: basicDetectors, vault }));
+```
+
+### Added — Drop-in middlewares
+
+Four ways to wire Sether into an existing app without rewriting handlers:
+
+- **`wrapFetch({ detectors, vault })`** — drop-in replacement for the
+  global `fetch`. Redacts string request bodies before they leave the
+  process; restores text response bodies on the way back. Binary bodies
+  pass through.
+- **`createExpressMiddleware({ detectors, vault })`** — standard
+  Express middleware (`(req, res, next) => …`). Redacts `req.body` for
+  string and JSON shapes; wraps `res.send` + `res.json` to restore
+  outgoing responses. Express is a peer dep — not imported here.
+- **`wrapOpenAI(client, { detectors, vault })`** — wraps an `OpenAI`
+  client so `chat.completions.create` redacts `messages[].content`
+  (string and array-of-parts forms) before the API call and restores
+  `choices[].message.content` / `choices[].delta.content` on the way
+  back. `openai` is an optional peer dep via `peerDependenciesMeta`.
+- **`wrapAnthropic(client, { detectors, vault })`** — wraps an
+  `Anthropic` client so `messages.create` redacts the user message content
+  plus the top-level `system` prompt (string and array-of-blocks forms)
+  and restores `content[]` text blocks on the way back.
+  `@anthropic-ai/sdk` is an optional peer dep.
+
+The SDK wrappers are duck-typed — they don't import the SDK packages
+themselves, so users who don't use them pay zero install cost.
+
+### Added — Audit event schema (`AuditEvent`, `AuditSink`, sinks)
+
+Foundation for the hosted compliance-reporting tier. The OSS package
+ships:
+
+- **`AuditEvent`** — the canonical event shape (timestamp, detector,
+  valueLength, token, action, optional tenantId, requestId, destination,
+  and regulation mappings). **The original value is never carried in
+  the event** — only its length.
+- **`AuditSink`** — one-method interface (`write(event)`) that any sink
+  can implement.
+- **`ConsoleAuditSink`** — JSONL writer to stderr (configurable target,
+  optional pretty mode).
+- **`MemoryAuditSink`** — accumulates events in memory; useful for
+  tests and the in-browser sandbox.
+- **`DEFAULT_REGULATION_MAPPINGS`** — every built-in detector type
+  pre-mapped to GDPR / SOC 2 / HIPAA / EU AI Act / PCI DSS / ISO 27001 /
+  NDPA references. The hosted gateway uses the same map.
+
+Persistence, SIEM export (Splunk / Datadog / Logpush), and time-windowed
+compliance reports live in the hosted Pro tier — not in OSS — but the
+event shape and reference sink are stable contracts.
+
+### Added — Public `redactSync(text, { detectors, vault })` helper
+
+Synchronous one-shot redaction for cases where you have the full text in
+hand and don't need chunk-boundary buffering (e.g. a single SSE payload,
+a JSON field, a log line). Functionally identical to the `isFinal: true`
+path of the streaming Transform — same detection, same vault writes.
+Use `createRedactStream` instead when input may span chunk boundaries.
+
+### Build & test surface
+
+- Tests: **101 passing** (was 52 in 0.1.3 → +49 new tests across
+  secrets, SSE, fetch, OpenAI wrapper, Anthropic wrapper, audit)
+- Build size: CJS **28.07 KB** (was 11.78 KB), ESM **27.22 KB** (was
+  11.47 KB). +~16 KB for all the new modules combined.
+- ReDoS scan: **117 patterns, 0 unsafe** (was 23 — most new patterns
+  are bounded single-class regexes in the secrets pack)
+- The 0.1.3 supply-chain win is preserved: still no `require('net')`
+  or any network-module reference in the published bundle.
+
+### Migration
+
+None. The 0.1.x API is unchanged. 0.2.0 is a drop-in upgrade.
+
+To opt into the new pieces:
+
+```ts
+// New: include secrets detection
+import { Sether, basicDetectors, secretsDetectors } from '@raeven-co/sether';
+const sether = new Sether({
+  detectors: [...basicDetectors, ...secretsDetectors],
+});
+
+// New: drop-in middleware for an OpenAI client
+import OpenAI from 'openai';
+import { wrapOpenAI } from '@raeven-co/sether';
+const openai = wrapOpenAI(new OpenAI({ apiKey }), {
+  detectors: sether.detectors,
+  vault: sether.vault,
+});
+```
+
+### Deferred to 0.3 / Pro hosted tier
+
+Capture-now-for-context list — these were on the 0.2 wishlist but
+deliberately not bundled here:
+
+- **NER detectors** (names, organisations, addresses) — needs
+  `onnxruntime-node` (~30 MB native binary) + a model file. Will ship
+  as a separate package `@raeven-co/sether-ner` to keep the core OSS
+  install lean.
+- **Pluggable Redis / Postgres vault adapters** — bundling these would
+  add ~10 MB of optional deps. The `Vault` interface already supports
+  BYO adapters; the README now includes adapter pattern examples.
+- **Compliance reports** (time-windowed PDF/CSV mapped to SOC 2 / GDPR /
+  HIPAA controls) — aggregates over an audit-event store. Lives in the
+  Cloudflare Workers hosted tier.
+- **Audit log persistence + SIEM export** — same: needs a database +
+  scheduled jobs. Hosted-tier feature. The audit-event schema we
+  shipped here is what makes the hosted side possible.
+
+---
+
 ## 0.1.3 — 2026-05-16
 
 Patch release: supply-chain hardening. No public API change, no behavior

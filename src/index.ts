@@ -47,10 +47,23 @@ export class Sether {
   get vault(): Vault {
     return this.#vault;
   }
+
+  get detectors(): readonly Detector[] {
+    return this.#detectors;
+  }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+//  Public exports
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Core
+export { MemoryVault, createRedactStream, createRestoreStream };
+export { redactSync } from './stream/redact.js';
+export type { RedactSyncOptions } from './stream/redact.js';
+
+// Detectors — basic pack
 export {
-  MemoryVault,
   basicDetectors,
   emailDetector,
   creditCardDetector,
@@ -59,10 +72,42 @@ export {
   ipv6Detector,
   ibanDetector,
   phoneDetector,
-  createRedactStream,
-  createRestoreStream,
 };
 
+// Detectors — secrets pack (new in 0.2.0)
+export {
+  secretsDetectors,
+  awsAccessKeyDetector,
+  openaiKeyDetector,
+  anthropicKeyDetector,
+  githubPatDetector,
+  slackTokenDetector,
+  stripeKeyDetector,
+  jwtDetector,
+  highEntropyDetector,
+} from './detectors/secrets.js';
+
+// SSE / JSON-stream mode (new in 0.2.0)
+export { createSSERedactStream, createSSERestoreStream } from './stream/sse.js';
+export type { SSEStreamOptions } from './stream/sse.js';
+
+// Audit (new in 0.2.0)
+export type { AuditEvent, AuditSink, RegulationMapping } from './audit/types.js';
+export { DEFAULT_REGULATION_MAPPINGS } from './audit/types.js';
+export { ConsoleAuditSink, MemoryAuditSink } from './audit/console.js';
+export type { ConsoleAuditSinkOptions } from './audit/console.js';
+
+// Middleware (new in 0.2.0)
+export { wrapFetch } from './middleware/fetch.js';
+export type { WrapFetchOptions } from './middleware/fetch.js';
+export { createExpressMiddleware } from './middleware/express.js';
+export type { ExpressMiddlewareOptions } from './middleware/express.js';
+export { wrapOpenAI } from './middleware/openai.js';
+export type { WrapOpenAIOptions } from './middleware/openai.js';
+export { wrapAnthropic } from './middleware/anthropic.js';
+export type { WrapAnthropicOptions } from './middleware/anthropic.js';
+
+// Types
 export type { Detector, Vault };
 export type { RedactStreamOptions, RestoreStreamOptions };
 export type { DetectorMatch } from './detectors/types.js';

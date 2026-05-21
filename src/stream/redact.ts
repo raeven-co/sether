@@ -129,3 +129,28 @@ function redactRange(
   out += text.slice(pos, rangeEnd);
   return out;
 }
+
+/**
+ * Synchronous one-shot redaction of a complete text fragment.
+ *
+ * Use when you have the entire text in hand and don't need chunk-boundary
+ * buffering — for example, redacting a single SSE payload line, a JSON
+ * field, or any other discrete value. Internally this is identical to the
+ * `isFinal: true` path of the streaming Transform: detect all matches,
+ * resolve overlaps (longest wins), substitute tokens, write to the vault.
+ *
+ * For streaming input where PII may span chunk boundaries, use
+ * `createRedactStream` instead — it adds the safe-distance buffering.
+ */
+export interface RedactSyncOptions {
+  detectors: readonly Detector[];
+  vault: Vault;
+  /** UUID generator. Override for deterministic tests. */
+  uuid?: () => string;
+}
+
+export function redactSync(text: string, opts: RedactSyncOptions): string {
+  const uuid = opts.uuid ?? randomUUID;
+  const matches = detectAll(text, opts.detectors);
+  return redactRange(text, matches, 0, text.length, opts.vault, uuid);
+}
