@@ -12,8 +12,17 @@ import { createRestoreStream } from '../stream/restore.js';
 //  before they leave the process, then restores the response body on the
 //  way back.
 //
-//  Use it as a drop-in replacement:
-//    const safeFetch = wrapFetch({ detectors, vault });
+//  The underlying fetch implementation is REQUIRED — the caller injects it.
+//  Sether does not reach for `globalThis.fetch` itself. This keeps the
+//  package's supply-chain capability surface honest: the *caller* declares
+//  the network surface, not the library.
+//
+//  Usage:
+//    const safeFetch = wrapFetch({
+//      detectors,
+//      vault,
+//      fetchImpl: fetch,   //  Node 18+ / browsers — pass the runtime's fetch
+//    });
 //    const response = await safeFetch('https://api.openai.com/v1/chat/completions', {
 //      method: 'POST',
 //      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
@@ -31,15 +40,21 @@ export interface WrapFetchOptions {
   detectors: readonly Detector[];
   vault: Vault;
   safeDistanceBytes?: number;
-  /** Underlying fetch impl. Defaults to globalThis.fetch. */
-  fetchImpl?: typeof fetch;
+  /**
+   * The underlying fetch implementation to wrap. Required — Sether does not
+   * implicitly reach for a global `fetch`. Callers pass their runtime's
+   * fetch (Node 18+, undici, polyfill, mock, etc.) explicitly.
+   */
+  fetchImpl: typeof fetch;
 }
 
 export function wrapFetch(opts: WrapFetchOptions): typeof fetch {
-  const baseFetch = opts.fetchImpl ?? globalThis.fetch;
-  if (typeof baseFetch !== 'function') {
-    throw new Error('wrapFetch: no fetch implementation available. Pass fetchImpl explicitly on Node < 18.');
+  if (typeof opts.fetchImpl !== 'function') {
+    throw new Error(
+      'wrapFetch: opts.fetchImpl is required. Pass your runtime fetch: wrapFetch({ ..., fetchImpl: fetch }) on Node 18+ or in the browser.',
+    );
   }
+  const baseFetch = opts.fetchImpl;
 
   return (async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
     const redactedInit = init ? await redactRequestBody(init, opts) : init;

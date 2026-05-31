@@ -87,6 +87,15 @@ export {
   highEntropyDetector,
 } from './detectors/secrets.js';
 
+// Detectors — identity pack (new in 0.3.0; opt-in, NOT in basicDetectors)
+export {
+  identityDetectors,
+  nameDetector,
+  dobDetector,
+  passportDetector,
+  addressDetector,
+} from './detectors/identity.js';
+
 // SSE / JSON-stream mode (new in 0.2.0)
 export { createSSERedactStream, createSSERestoreStream } from './stream/sse.js';
 export type { SSEStreamOptions } from './stream/sse.js';

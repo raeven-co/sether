@@ -25,7 +25,7 @@ Groq, Ollama**, your own fine-tunes — anything that speaks HTTP and
 streams text. Sether doesn't care who's on the other end; it operates on
 the text stream.
 
-**Status:** `0.2.0` — secrets pack, SSE/JSON-stream mode, audit events, and drop-in middlewares for Express / fetch / OpenAI / Anthropic.
+**Status:** `0.3.0` — opt-in identity pack (names, DOB, passport, address), secrets pack, SSE/JSON-stream mode, audit events, and drop-in middlewares for Express / fetch / OpenAI / Anthropic.
 A product of **[Raeven, Inc.](https://raeven.co)**
 
 ---
@@ -137,7 +137,7 @@ const sether = new Sether({
 });
 ```
 
-### Built-in detectors (0.1.x)
+### Built-in detectors (basic pack)
 
 | Detector | Method | Notes |
 | --- | --- | --- |
@@ -148,6 +148,40 @@ const sether = new Sether({
 | `ipv4Detector` (`IPV4`) | Strict octet-bounded regex | `0–255` per octet, no leading zeros. |
 | `ipv6Detector` (`IPV6`) | Candidate regex + Node's native `isIPv6` validator | **Known limit:** `::1` and IPv4-in-IPv6 (`::ffff:192.0.2.1`) not matched. |
 | `ibanDetector` (`IBAN`) | Regex + mod-97 checksum | Validates against ISO 13616. |
+
+### Identity pack (opt-in — new in 0.3.0)
+
+Names, dates of birth, passport numbers, and addresses have no
+self-validating shape the way an IBAN or credit card does, so a bare regex
+for them is a false-positive machine. The identity pack instead uses
+**label-anchored** detection: it redacts a value only when it appears with
+the label that introduces it (`Name:`, `DOB:`, `Passport No:`, `Address:`),
+or — for the few distinctive standalone shapes — a structure strong enough
+to keep false positives low (a street line with a house number + suffix, a
+UK postcode).
+
+It is **not** part of `basicDetectors`, so `new Sether()` behaviour is
+unchanged. Opt in explicitly:
+
+```ts
+import { Sether, basicDetectors, identityDetectors } from '@raeven-co/sether';
+
+const sether = new Sether({
+  detectors: [...basicDetectors, ...identityDetectors],
+});
+```
+
+| Detector | Method | Notes |
+| --- | --- | --- |
+| `nameDetector` (`NAME`) | Label/salutation anchor + Unicode-aware capture | Catches labelled names including non-English (`Name: 田中太郎`, `Nom: José Müller`). Does **not** detect unlabelled names in free prose — that's NER (roadmap). |
+| `dobDetector` (`DOB`) | Label anchor + calendar & plausibility validation | ISO / numeric / written dates; rejects invalid calendar dates and implausible birth years. |
+| `passportDetector` (`PASSPORT`) | Label anchor + format check | 6–9 alphanumerics following a `passport` label; requires at least one digit. |
+| `addressDetector` (`ADDRESS`) | Label anchor, street-suffix structure, UK postcode | Labelled address lines, `<number> <words> <Street/Ave/Rd…>`, and UK postcodes. |
+
+**Coverage note:** the identity pack is strongest on *labelled* and
+*structured* PII (forms, KYC, RAG documents, support tickets). Free-text
+NER for unlabelled names / organisations / locations is on the roadmap as
+the separate `@raeven-co/sether-ner` package.
 
 All detectors implement the `Detector` interface — you can write your own
 and pass it via the `detectors` option.
@@ -223,10 +257,10 @@ const sether = new Sether({ safeDistanceBytes: 1024 });
 ## What's verified in this release
 
 - **Streaming-safe:** chunk-boundary round-trip proven by property-based tests
-- **ReDoS-safe:** all 21 regex literals scanned by `safe-regex2` in CI
+- **ReDoS-safe:** all regex literals scanned by `safe-regex2` in CI (146 patterns, 0 unsafe)
 - **TypeScript strict mode:** no `any`, no implicit types
-- **Dual build:** ESM + CJS, ≈ 10 KB each
-- **CI matrix:** Node 18 / 20 / 22 — lint, typecheck, format, regex-safety, 47 tests, build
+- **Dual build:** ESM + CJS, ≈ 35 KB each
+- **CI matrix:** Node 18 / 20 / 22 — lint, typecheck, format, regex-safety, 123 tests, build
 - **MIT licensed** — fork it, audit it, no vendor lock-in
 
 ---
@@ -235,11 +269,11 @@ const sether = new Sether({ safeDistanceBytes: 1024 });
 
 Known limitations in this release:
 
-- **Email detection is ASCII-only.** IDN/Unicode local parts won't match. Fix lands in 0.2.
+- **Email detection is ASCII-only.** IDN/Unicode local parts won't match. Unicode-aware email is on the roadmap.
 - **IPv6 `::1` (loopback) is not detected.** Candidate regex requires 4+ chars. Loopback isn't customer PII, but flag it in your audit logs if it matters for your threat model.
 - **Credit-card regex is permissive.** Anything 13–23 chars of digits/spaces/dashes is a candidate, then validated by Luhn. False positives in dense numeric content are possible.
-- **No NER yet.** Names, organisations, addresses ship in 0.2 (lazy-loaded ONNX model).
-- **No production benchmarks yet.** Throughput numbers (vs Microsoft Presidio) will be committed in 0.2.
+- **Names / DOB / passport / address are label-anchored, not free-text NER.** The opt-in identity pack (0.3.0) catches these when they appear with a label or distinctive structure. Unlabelled names / organisations / locations in running prose need the ONNX NER model shipping separately as `@raeven-co/sether-ner`.
+- **No production benchmarks yet.** Throughput numbers (vs Microsoft Presidio) will land alongside the NER package.
 
 ---
 
@@ -277,9 +311,15 @@ openaiResponse.body.pipe(createSSERedactStream({ detectors: basicDetectors, vaul
 Four ways to wire Sether into an existing app without rewriting handlers:
 
 ```ts
-// Generic fetch
+// Generic fetch — pass your runtime's fetch explicitly. Sether does not
+// reach for globalThis.fetch implicitly (keeps the supply-chain surface
+// honest: the caller declares the network capability, not the library).
 import { wrapFetch } from '@raeven-co/sether';
-const safeFetch = wrapFetch({ detectors: sether.detectors, vault: sether.vault });
+const safeFetch = wrapFetch({
+  detectors: sether.detectors,
+  vault: sether.vault,
+  fetchImpl: fetch,        //  Node 18+, or your polyfill / undici / mock
+});
 
 // Express
 import express from 'express';
@@ -342,10 +382,11 @@ Track progress: <https://github.com/raeven-co/sether>
 - [x] `safe-regex2` enforcement in CI
 - [x] Dual ESM + CJS build
 - [x] Detector pack: email, phone, CC, SSN, IPv4, IPv6, IBAN
-- [ ] Detector pack: secrets (AWS, OpenAI, Anthropic, GitHub, Slack, Stripe, JWT)
-- [ ] Detector pack: ONNX-based NER for names / orgs
-- [ ] JSON-stream mode for SSE / JSON LLM streams
-- [ ] Drop-in middlewares (Express, fetch, OpenAI SDK, Anthropic SDK)
+- [x] Detector pack: secrets (AWS, OpenAI, Anthropic, GitHub, Slack, Stripe, JWT)
+- [x] JSON-stream mode for SSE / JSON LLM streams
+- [x] Drop-in middlewares (Express, fetch, OpenAI SDK, Anthropic SDK)
+- [x] Detector pack: identity (label-anchored name / DOB / passport / address)
+- [ ] Detector pack: ONNX-based NER for free-text names / orgs / locations (`@raeven-co/sether-ner`)
 - [ ] Pluggable vault adapters (Redis, Postgres)
 - [ ] Benchmarks vs Microsoft Presidio (committed in repo)
 - [ ] Migration guide from `redact-ai-stream` 1.x

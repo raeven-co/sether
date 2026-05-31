@@ -1,5 +1,103 @@
 # Changelog
 
+## 0.3.0 — 2026-05-31
+
+Minor release: a new **opt-in identity detector pack** (names, dates of
+birth, passport numbers, addresses) plus the supply-chain hygiene change to
+`wrapFetch`. **No change to default behaviour** — `new Sether()` runs the
+same `basicDetectors` it always has; the identity pack only activates when
+you opt in explicitly.
+
+### Added — identity detector pack (`identityDetectors`)
+
+Four label-anchored detectors for the higher-context PII classes that have
+no self-validating shape (so a bare regex would be a false-positive
+machine). They redact a value only when it appears with the label that
+introduces it — `Name:`, `DOB:`, `Passport No:`, `Address:` — or, for the
+few distinctive standalone shapes, a structure strong enough to keep false
+positives low (street line with a house number + suffix, UK postcode).
+
+```ts
+import { Sether, basicDetectors, identityDetectors } from '@raeven-co/sether';
+
+const sether = new Sether({
+  detectors: [...basicDetectors, ...identityDetectors],
+});
+```
+
+Detectors: `nameDetector` (`NAME`), `dobDetector` (`DOB`, calendar- and
+plausibility-validated), `passportDetector` (`PASSPORT`), `addressDetector`
+(`ADDRESS`). Value capture is **Unicode-aware**, so a labelled non-English
+name (`Name: 田中太郎`, `Nom: José Müller`) is redacted too.
+
+**Not** in `basicDetectors` — existing installs are unaffected unless they
+import the pack. Free-text NER for unlabelled names / organisations /
+locations in running prose remains roadmap (the separate
+`@raeven-co/sether-ner` ONNX package).
+
+### Changed — `wrapFetch` now requires `fetchImpl` (breaking)
+
+Folded into this 0.3.0 minor (0.x semver permits breaking changes in a
+minor). Anyone already passing `fetchImpl` explicitly is unaffected.
+
+Previously, `wrapFetch({ detectors, vault })` would fall back to
+`globalThis.fetch` if `fetchImpl` was not provided. That implicit fallback
+caused Socket.dev (and other static supply-chain analysers) to flag the
+package as network-capable — a *correct* capability declaration, but one
+the package itself doesn't need to make. Cleaner: the **caller** declares
+the network surface by handing in its own fetch.
+
+The line of code that was being flagged:
+
+```ts
+const baseFetch = opts.fetchImpl ?? globalThis.fetch;   // 0.2.0 (flagged)
+```
+
+becomes:
+
+```ts
+if (typeof opts.fetchImpl !== 'function') {              // 0.2.1
+  throw new Error('wrapFetch: opts.fetchImpl is required. …');
+}
+const baseFetch = opts.fetchImpl;
+```
+
+### Migration
+
+Users of `wrapFetch` who were relying on the implicit `globalThis.fetch`
+fallback need a one-line change:
+
+```ts
+// 0.2.0
+const safeFetch = wrapFetch({ detectors, vault });
+
+// 0.2.1
+const safeFetch = wrapFetch({ detectors, vault, fetchImpl: fetch });
+```
+
+Everything else in the 0.2.x API is unchanged.
+
+### Why
+
+After 0.1.3 dropped the `node:net` import and the supply-chain score
+moved 75 → 76 (essentially unchanged), the residual flag was traced to
+the `globalThis.fetch` reference in `wrapFetch`. With this release the
+bundled `dist/index.cjs` and `dist/index.js` contain **no references**
+to `globalThis.fetch`, `XMLHttpRequest`, `WebSocket`, `require('http')`,
+`require('https')`, `require('net')`, `require('tls')`, `require('dns')`,
+`require('dgram')`, or `require('http2')`. Socket.dev's next re-scan
+should reflect that — the supply-chain score is expected to move from
+76 → 95+ once it lands.
+
+### Build & test surface
+
+- Tests: **123 passing** (101 prior + 22 for the identity pack)
+- Build size: CJS 35.29 KB, ESM 34.32 KB
+- ReDoS scan: 146 patterns, 0 unsafe
+- No network-capability references in `dist/`
+
+---
+
 ## 0.2.0 — 2026-05-21
 
 Minor release. Major feature expansion. **No breaking changes to the
