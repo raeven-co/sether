@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.1 — 2026-05-31
+
+Docs-only patch. **No code changes** — the published API and behaviour are
+identical to 0.3.0. This release exists to refresh the README on the npm
+package page, which for 0.3.0 still described 0.2.0 as "this release" and
+listed NER as shipping in 0.3. Corrected: the identity pack is now the
+headline 0.3.x feature, the 0.2.0 capabilities are documented as the stable
+API (not "new"), and free-text NER is clearly future work
+(`@raeven-co/sether-ner`). Also corrected stale test/regex/size counts and
+the IPv6 validator description (in-tree, not `node:net`).
+
 ## 0.3.0 — 2026-05-31
 
 Minor release: a new **opt-in identity detector pack** (names, dates of

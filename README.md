@@ -146,7 +146,7 @@ const sether = new Sether({
 | `creditCardDetector` (`CC`) | Bounded regex + Luhn check | 13–19 digit numbers passing Luhn. ReDoS-safe. |
 | `ssnDetector` (`SSN`) | Regex + SSA invalid-prefix blacklist | Rejects area `000`, `666`, and `9XX` (ITIN range), group `00`, serial `0000`. |
 | `ipv4Detector` (`IPV4`) | Strict octet-bounded regex | `0–255` per octet, no leading zeros. |
-| `ipv6Detector` (`IPV6`) | Candidate regex + Node's native `isIPv6` validator | **Known limit:** `::1` and IPv4-in-IPv6 (`::ffff:192.0.2.1`) not matched. |
+| `ipv6Detector` (`IPV6`) | Candidate regex + in-tree `isIPv6` validator (equivalent to Node's `net.isIPv6`, no `node:net` import) | **Known limit:** `::1` and IPv4-in-IPv6 (`::ffff:192.0.2.1`) not matched. |
 | `ibanDetector` (`IBAN`) | Regex + mod-97 checksum | Validates against ISO 13616. |
 
 ### Identity pack (opt-in — new in 0.3.0)
@@ -277,9 +277,25 @@ Known limitations in this release:
 
 ---
 
-## What's new in 0.2.0
+## What's new in 0.3.0
 
-Most of the original 0.2 wishlist shipped in this release. **No breaking changes.** Drop-in upgrade from 0.1.x.
+The headline of this release is the **opt-in identity detector pack** —
+label-anchored detection for names, dates of birth, passport numbers, and
+addresses (documented under [Identity pack](#identity-pack-opt-in--new-in-030)
+above). It is **not** part of `basicDetectors`, so `new Sether()` behaves
+exactly as it did in 0.2.x — existing installs are unaffected unless they
+opt in.
+
+This release also makes `wrapFetch`'s `fetchImpl` **required** — it no longer
+falls back to `globalThis.fetch`. That's a small breaking change for anyone
+who relied on the implicit fallback; the one-line migration is to pass
+`fetchImpl: fetch`. Full notes in the [CHANGELOG](./CHANGELOG.md).
+
+---
+
+## Capabilities: secrets, SSE, middlewares & audit
+
+These shipped in 0.2.0 and are part of the stable API.
 
 ### Secrets detector pack (`secretsDetectors`)
 
@@ -363,13 +379,13 @@ Synchronous one-shot redaction for cases where you have the full text in hand (a
 
 ---
 
-## What's coming (0.3 / Pro hosted tier)
+## What's coming (next / Pro hosted tier)
 
-- **NER detectors** — names, organisations, addresses. Will ship as a separate `@raeven-co/sether-ner` package to keep the core install lean (avoids ~30 MB native ONNX runtime).
+- **Free-text NER detectors** — unlabelled names, organisations, and locations in running prose. Ships as a separate `@raeven-co/sether-ner` package to keep the core install lean (avoids the ~30 MB native ONNX runtime). The 0.3.0 identity pack already covers these entities when they are *labelled*; NER extends them to free text.
 - **Vault adapters as reference examples** — Redis and Postgres patterns documented in the repo, not bundled (the `Vault` interface already supports BYO).
 - **Compliance reports** mapped to SOC 2 / GDPR / HIPAA controls — Pro hosted tier.
 - **Audit log persistence + SIEM export** — Pro hosted tier.
-- **Benchmarks vs Microsoft Presidio** — alongside the 0.3 NER release.
+- **Benchmarks vs Microsoft Presidio** — alongside the `sether-ner` release.
 
 Track progress: <https://github.com/raeven-co/sether>
 
