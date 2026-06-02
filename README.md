@@ -26,7 +26,7 @@ streams text. Sether doesn't care who's on the other end; it operates on
 the text stream.
 
 **Status:** `0.3.0` — opt-in identity pack (names, DOB, passport, address), secrets pack, SSE/JSON-stream mode, audit events, and drop-in middlewares for Express / fetch / OpenAI / Anthropic.
-A product of **[Raeven, Inc.](https://raeven.co)**
+A product of **[Raeven, Inc.](https://admin.raevenmarket.com.ng)**
 
 ---
 
