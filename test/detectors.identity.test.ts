@@ -6,6 +6,66 @@ import {
   addressDetector,
 } from '../src/detectors/identity.js';
 
+describe('identity pack — multilingual labels (0.4.0)', () => {
+  it('NAME: French label "Nom:"', () => {
+    const m = nameDetector.detect('Nom: José Müller');
+    expect(m).toHaveLength(1);
+    expect(m[0]?.value).toBe('José Müller');
+  });
+
+  it('NAME: Spanish label "Nombre:"', () => {
+    const m = nameDetector.detect('Nombre: Carlos Ruiz');
+    expect(m[0]?.value).toBe('Carlos Ruiz');
+  });
+
+  it('NAME: Japanese label "名前：" (fullwidth colon)', () => {
+    const m = nameDetector.detect('名前：田中太郎');
+    expect(m).toHaveLength(1);
+    expect(m[0]?.value).toBe('田中太郎');
+  });
+
+  it('NAME: Cyrillic label "Имя:"', () => {
+    const m = nameDetector.detect('Имя: Иван Петров');
+    expect(m[0]?.value).toBe('Иван Петров');
+  });
+
+  it('DOB: German label "Geburtsdatum:"', () => {
+    const m = dobDetector.detect('Geburtsdatum: 1990-05-12');
+    expect(m).toHaveLength(1);
+    expect(m[0]?.value).toBe('1990-05-12');
+  });
+
+  it('PASSPORT: German label "Reisepass:"', () => {
+    const m = passportDetector.detect('Reisepass: A1234567');
+    expect(m[0]?.value).toBe('A1234567');
+  });
+
+  it('ADDRESS: French label "Adresse:"', () => {
+    const m = addressDetector.detect('Adresse: 12 Rue de la Paix, Paris 75002');
+    expect(m.some((x) => x.value.includes('Rue de la Paix'))).toBe(true);
+  });
+});
+
+describe('identity pack — correctness fixes (0.4.0)', () => {
+  it('DOB does not carve a date out of a longer number (no digit leak)', () => {
+    // "19999" must not match as "1999" leaving a stray "9".
+    expect(dobDetector.detect('DOB: 1/1/19999')).toHaveLength(0);
+  });
+
+  it('NAME keeps the surname across a double space', () => {
+    const m = nameDetector.detect('Name: John  Smith');
+    expect(m[0]?.value).toBe('John  Smith');
+  });
+
+  it('NAME rejects salutation + common-noun ("Dear Sir")', () => {
+    expect(nameDetector.detect('Dear Sir, thanks')).toHaveLength(0);
+  });
+
+  it('NAME rejects an all-common-words value ("Name: The Customer")', () => {
+    expect(nameDetector.detect('Name: The Customer')).toHaveLength(0);
+  });
+});
+
 describe('nameDetector (label-anchored)', () => {
   it('captures a labelled full name', () => {
     const m = nameDetector.detect('Name: John Smith');

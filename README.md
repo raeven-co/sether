@@ -160,6 +160,11 @@ or — for the few distinctive standalone shapes — a structure strong enough
 to keep false positives low (a street line with a house number + suffix, a
 UK postcode).
 
+**Multilingual (0.4.0):** labels are recognised in many languages — Latin-script
+(`Name:`/`Nom:`/`Nombre:`/`Geburtsdatum:`/`Adresse:`…) plus CJK, Cyrillic, and
+Arabic (`名前：`, `Имя:`, `الاسم:`). Value capture is Unicode-aware throughout, so
+`Nom: José Müller`, `名前：田中太郎`, and `Имя: Иван Петров` are all redacted.
+
 It is **not** part of `basicDetectors`, so `new Sether()` behaviour is
 unchanged. Opt in explicitly:
 
@@ -173,7 +178,7 @@ const sether = new Sether({
 
 | Detector | Method | Notes |
 | --- | --- | --- |
-| `nameDetector` (`NAME`) | Label/salutation anchor + Unicode-aware capture | Catches labelled names including non-English (`Name: 田中太郎`, `Nom: José Müller`). Does **not** detect unlabelled names in free prose — that's NER (roadmap). |
+| `nameDetector` (`NAME`) | Multilingual label/salutation anchor + Unicode-aware capture | Catches labelled names across languages (`Name: 田中太郎`, `Nom: José Müller`, `Имя: Иван Петров`). Does **not** detect unlabelled names in free prose — that's NER (roadmap). |
 | `dobDetector` (`DOB`) | Label anchor + calendar & plausibility validation | ISO / numeric / written dates; rejects invalid calendar dates and implausible birth years. |
 | `passportDetector` (`PASSPORT`) | Label anchor + format check | 6–9 alphanumerics following a `passport` label; requires at least one digit. |
 | `addressDetector` (`ADDRESS`) | Label anchor, street-suffix structure, UK postcode | Labelled address lines, `<number> <words> <Street/Ave/Rd…>`, and UK postcodes. |
@@ -260,7 +265,7 @@ const sether = new Sether({ safeDistanceBytes: 1024 });
 - **ReDoS-safe:** all regex literals scanned by `safe-regex2` in CI (146 patterns, 0 unsafe)
 - **TypeScript strict mode:** no `any`, no implicit types
 - **Dual build:** ESM + CJS, ≈ 35 KB each
-- **CI matrix:** Node 18 / 20 / 22 — lint, typecheck, format, regex-safety, 123 tests, build
+- **CI matrix:** Node 18 / 20 / 22 — lint, typecheck, format, regex-safety, 134 tests, build
 - **MIT licensed** — fork it, audit it, no vendor lock-in
 
 ---

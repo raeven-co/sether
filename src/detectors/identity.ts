@@ -19,8 +19,13 @@ import type { Detector, DetectorMatch } from './types.js';
 //      scanner (scripts/check-regex-safety.mjs, safe-regex2) enforces this.
 //    • We over-match a small candidate window with a simple regex, then do
 //      the precise extraction and validation in plain code.
-//    • Value capture is Unicode-aware, so a labelled non-English name
-//      (e.g. "Name: 田中太郎" or "Nom: José Müller") is still redacted.
+//
+//  Multilingual (new in 0.4.0): each class is anchored on labels in many
+//  languages. Latin-script labels (English, French, Spanish, German, Dutch,
+//  Portuguese, Italian) use ASCII word boundaries; non-Latin labels (CJK,
+//  Cyrillic, Arabic) are anchored on a trailing colon instead, since `\b` is
+//  ASCII-only. Value capture is Unicode-aware throughout, so "Nom: José
+//  Müller", "名前: 田中太郎", and "Имя: Иван Петров" are all redacted.
 //
 //  Known limitation: free-text NER (unlabelled names / organisations /
 //  locations in running prose) is NOT covered here — that needs the ONNX
@@ -41,29 +46,51 @@ function isLetter(ch: string): boolean {
   return LETTER_RE.test(ch);
 }
 
+/**
+ * Run each label regex over `text` and call `cb` with the offset immediately
+ * after every label match (the point where the value begins). Each detector
+ * then extracts and validates its own value from there.
+ */
+function eachLabelMatch(
+  text: string,
+  regexes: readonly RegExp[],
+  cb: (valueStart: number) => void,
+): void {
+  for (const re of regexes) {
+    re.lastIndex = 0;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(text)) !== null) {
+      cb(m.index + m[0].length);
+      // Defensive: never spin on a zero-length match.
+      if (m.index === re.lastIndex) re.lastIndex++;
+    }
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 //  NAME — label/salutation anchored, Unicode-aware
 // ─────────────────────────────────────────────────────────────────────────────
 
-// `\b…\b` keeps "name" from matching inside "filename"/"username". The
-// trailing class consumes the separator after the label (": ", " - ", etc.).
+// Latin-script labels. `\b…\b` keeps "name" from matching inside
+// "filename"/"username"; the trailing class consumes the separator (": ", etc.).
 const NAME_LABEL_RE =
-  /\b(?:full[\s_-]?name|first[\s_-]?name|last[\s_-]?name|name|patient|customer|client|contact|cardholder|account[\s_-]?holder|beneficiary|attn|attention|dear|mr|mrs|ms|mx|dr|prof)\b[\s:.=_-]{0,3}/gi;
+  /\b(?:full[\s_-]?name|first[\s_-]?name|last[\s_-]?name|name|nom|nombre|nome|naam|navn|patient|customer|client|contact|cardholder|account[\s_-]?holder|beneficiary|attn|attention|dear|mr|mrs|ms|mx|dr|prof)\b[\s:.=_-]{0,3}/gi;
 
-// Values that follow a name label but are clearly not a person.
-const NAME_DENYLIST = new Set([
-  'unknown',
-  'none',
-  'null',
-  'n',
-  'na',
-  'anonymous',
-  'the',
-  'and',
-  'is',
-  'of',
-  'redacted',
-  'test',
+// Non-Latin labels — anchored on a trailing colon (ASCII or fullwidth).
+const NAME_LABEL_INTL_RE = /(?:名前|氏名|姓名|이름|성명|имя|الاسم)\s*[:：]\s*/gi;
+
+const NAME_LABELS = [NAME_LABEL_RE, NAME_LABEL_INTL_RE] as const;
+
+// Words that follow a name label but are clearly not a person. If EVERY
+// captured word is in this set ("The Customer", "Dear Sir", "Service Team"),
+// the value is rejected.
+const NAME_COMMON_WORDS = new Set([
+  'the', 'and', 'is', 'of', 'a', 'an', 'our', 'your', 'my', 'their',
+  'unknown', 'none', 'null', 'na', 'anonymous', 'redacted', 'test',
+  'sir', 'madam', 'madame', 'team', 'service', 'support', 'customer',
+  'client', 'user', 'admin', 'everyone', 'all', 'hello', 'hi', 'dear',
+  'valued', 'account', 'holder', 'name', 'please', 'thanks', 'regards',
+  'mr', 'mrs', 'ms', 'dr', 'prof', 'staff', 'department', 'desk', 'president',
 ]);
 
 /**
@@ -98,13 +125,17 @@ function captureName(text: string, pos: number): string | null {
     }
     words++;
     i = j;
-    // Allow a single separating space before the next word.
-    if (i < text.length && text[i] === ' ') i++;
+    // Allow one or more spaces/tabs (not newlines) before the next word.
+    let k = i;
+    while (k < text.length && (text[k] === ' ' || text[k] === '\t')) k++;
+    if (k > i && k < text.length && isLetter(text[k] as string)) i = k;
     else break;
   }
   const value = text.slice(start, i).replace(/\s+$/, '');
   if (value.length < 2 || words === 0) return null;
-  if (NAME_DENYLIST.has(value.toLowerCase())) return null;
+  // Reject when every word is a common non-name word.
+  const parts = value.toLowerCase().split(/\s+/);
+  if (parts.every((w) => NAME_COMMON_WORDS.has(w))) return null;
   return value;
 }
 
@@ -112,16 +143,13 @@ export const nameDetector: Detector = {
   type: 'NAME',
   detect(text) {
     const matches: DetectorMatch[] = [];
-    NAME_LABEL_RE.lastIndex = 0;
-    let m: RegExpExecArray | null;
-    while ((m = NAME_LABEL_RE.exec(text)) !== null) {
-      const valueStart = m.index + m[0].length;
+    eachLabelMatch(text, NAME_LABELS, (valueStart) => {
       const value = captureName(text, valueStart);
-      if (!value) continue;
+      if (!value) return;
       const start = text.indexOf(value, valueStart);
-      if (start === -1) continue;
+      if (start === -1) return;
       matches.push({ start, end: start + value.length, value });
-    }
+    });
     return matches;
   },
 };
@@ -130,7 +158,12 @@ export const nameDetector: Detector = {
 //  DOB — date of birth, label-anchored + calendar/plausibility validated
 // ─────────────────────────────────────────────────────────────────────────────
 
-const DOB_LABEL_RE = /\b(?:date\s+of\s+birth|d\.?o\.?b\.?|birth\s?date|born)\b[\s:=-]{0,3}/gi;
+const DOB_LABEL_RE =
+  /\b(?:date\s+of\s+birth|date\s+de\s+naissance|fecha\s+de\s+nacimiento|data\s+de\s+nascimento|geburtsdatum|geboortedatum|d\.?o\.?b\.?|birth\s?date|born)\b[\s:=-]{0,3}/gi;
+
+const DOB_LABEL_INTL_RE = /(?:生年月日|出生日期|出生日|생년월일|дата\s+рождения)\s*[:：]\s*/gi;
+
+const DOB_LABELS = [DOB_LABEL_RE, DOB_LABEL_INTL_RE] as const;
 
 const MONTHS =
   'jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?';
@@ -139,10 +172,12 @@ const MONTH_INDEX: Record<string, number> = {
   jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12,
 };
 
-const DATE_ISO_RE = /^(\d{4})-(\d{1,2})-(\d{1,2})/;
-const DATE_NUM_RE = /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{2,4})/;
-const DATE_DMY_RE = new RegExp(`^(\\d{1,2})\\s+(${MONTHS})\\.?\\s*,?\\s*(\\d{4})`, 'i');
-const DATE_MDY_RE = new RegExp(`^(${MONTHS})\\.?\\s+(\\d{1,2})\\s*,?\\s*(\\d{4})`, 'i');
+// Trailing (?!\d) stops a valid date being carved out of a longer number
+// (e.g. "19999" must not match as "1999", leaking the stray digit).
+const DATE_ISO_RE = /^(\d{4})-(\d{1,2})-(\d{1,2})(?!\d)/;
+const DATE_NUM_RE = /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{2,4})(?!\d)/;
+const DATE_DMY_RE = new RegExp(`^(\\d{1,2})\\s+(${MONTHS})\\.?\\s*,?\\s*(\\d{4})(?!\\d)`, 'i');
+const DATE_MDY_RE = new RegExp(`^(${MONTHS})\\.?\\s+(\\d{1,2})\\s*,?\\s*(\\d{4})(?!\\d)`, 'i');
 
 function daysInMonth(year: number, month: number): number {
   if (month === 2) return (year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0)) ? 29 : 28;
@@ -196,15 +231,13 @@ export const dobDetector: Detector = {
   type: 'DOB',
   detect(text) {
     const matches: DetectorMatch[] = [];
-    DOB_LABEL_RE.lastIndex = 0;
-    let m: RegExpExecArray | null;
-    while ((m = DOB_LABEL_RE.exec(text)) !== null) {
-      let valueStart = m.index + m[0].length;
+    eachLabelMatch(text, DOB_LABELS, (vs) => {
+      let valueStart = vs;
       while (valueStart < text.length && /\s/.test(text[valueStart] as string)) valueStart++;
       const date = matchDateAt(text, valueStart);
-      if (!date) continue;
+      if (!date) return;
       matches.push({ start: valueStart, end: valueStart + date.length, value: date });
-    }
+    });
     return matches;
   },
 };
@@ -213,25 +246,29 @@ export const dobDetector: Detector = {
 //  PASSPORT — label-anchored (passport numbers have no universal checksum)
 // ─────────────────────────────────────────────────────────────────────────────
 
-const PASSPORT_LABEL_RE = /\bpassport(?:\s(?:no|number|num|#))?\b[\s:.#=-]{0,3}/gi;
+const PASSPORT_LABEL_RE =
+  /\b(?:passport|passeport|pasaporte|reisepass|passaporto|paspoort|passaporte)(?:\s(?:no|number|num|#))?\b[\s:.#=-]{0,3}/gi;
+
+const PASSPORT_LABEL_INTL_RE = /(?:パスポート|护照|여권|паспорт)\s*[:：#]?\s*/gi;
+
+const PASSPORT_LABELS = [PASSPORT_LABEL_RE, PASSPORT_LABEL_INTL_RE] as const;
+
 const PASSPORT_VALUE_RE = /^[A-Za-z0-9]{6,9}\b/;
 
 export const passportDetector: Detector = {
   type: 'PASSPORT',
   detect(text) {
     const matches: DetectorMatch[] = [];
-    PASSPORT_LABEL_RE.lastIndex = 0;
-    let m: RegExpExecArray | null;
-    while ((m = PASSPORT_LABEL_RE.exec(text)) !== null) {
-      let valueStart = m.index + m[0].length;
+    eachLabelMatch(text, PASSPORT_LABELS, (vs) => {
+      let valueStart = vs;
       while (valueStart < text.length && /\s/.test(text[valueStart] as string)) valueStart++;
       const v = PASSPORT_VALUE_RE.exec(text.slice(valueStart, valueStart + 12));
-      if (!v) continue;
+      if (!v) return;
       const value = v[0];
       // Require at least one digit — pure-letter words are not passport numbers.
-      if (!/\d/.test(value)) continue;
+      if (!/\d/.test(value)) return;
       matches.push({ start: valueStart, end: valueStart + value.length, value });
-    }
+    });
     return matches;
   },
 };
@@ -241,7 +278,11 @@ export const passportDetector: Detector = {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const ADDRESS_LABEL_RE =
-  /\b(?:(?:shipping|billing|mailing|home|residential)\s)?address(?:es)?\b[\s:.=-]{0,3}/gi;
+  /\b(?:(?:shipping|billing|mailing|home|residential)\s)?(?:address|adresse|adres|direccion|indirizzo|endereco)(?:es)?\b[\s:.=-]{0,3}/gi;
+
+const ADDRESS_LABEL_INTL_RE = /(?:住所|地址|주소|адрес|dirección|endereço)\s*[:：]\s*/gi;
+
+const ADDRESS_LABELS = [ADDRESS_LABEL_RE, ADDRESS_LABEL_INTL_RE] as const;
 
 const STREET_SUFFIX_RE =
   /\b(?:street|st|avenue|ave|road|rd|boulevard|blvd|lane|ln|drive|dr|court|ct|way|place|pl|terrace|ter|square|sq|highway|hwy|parkway|pkwy)\b\.?/gi;
@@ -257,10 +298,8 @@ export const addressDetector: Detector = {
     const matches: DetectorMatch[] = [];
 
     // (a) Labelled address line — capture to end of line, bounded.
-    ADDRESS_LABEL_RE.lastIndex = 0;
-    let m: RegExpExecArray | null;
-    while ((m = ADDRESS_LABEL_RE.exec(text)) !== null) {
-      let start = m.index + m[0].length;
+    eachLabelMatch(text, ADDRESS_LABELS, (vs) => {
+      let start = vs;
       while (start < text.length && /[ \t]/.test(text[start] as string)) start++;
       let end = start;
       while (end < text.length && text[end] !== '\n' && end - start < MAX_ADDRESS_LEN) end++;
@@ -269,7 +308,7 @@ export const addressDetector: Detector = {
       if (value.length >= 5 && /[\d,]/.test(value)) {
         matches.push({ start, end: start + value.length, value });
       }
-    }
+    });
 
     // (b) Standalone street line: street suffix preceded by a house number.
     STREET_SUFFIX_RE.lastIndex = 0;

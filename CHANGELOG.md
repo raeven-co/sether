@@ -1,5 +1,45 @@
 # Changelog
 
+## 0.4.0 — 2026-06-04
+
+Minor release: the identity pack now recognises labels in **many languages**,
+plus three correctness fixes. **No change to default behaviour** — the identity
+pack is still opt-in and `basicDetectors` is untouched.
+
+### Added — multilingual labels for the identity pack
+
+`nameDetector`, `dobDetector`, `passportDetector`, and `addressDetector` now
+anchor on labels beyond English:
+
+- **Latin-script** (ASCII word-boundary anchored): English plus French, Spanish,
+  German, Dutch, Portuguese, Italian — e.g. `Nom:`, `Nombre:`, `Geburtsdatum:`,
+  `Reisepass:`, `Adresse:`, `Indirizzo:`.
+- **Non-Latin** (colon-anchored, ASCII or fullwidth `：`): CJK, Cyrillic, Arabic —
+  e.g. `名前：`, `氏名：`, `이름:`, `Имя:`, `パスポート:`, `住所:`, `الاسم:`.
+
+Value capture was already Unicode-aware; this closes the gap where the *label*
+trigger was English-only. `Nom: José Müller`, `名前：田中太郎`, and
+`Имя: Иван Петров` are now all redacted. This makes the documented
+"works in any language" behaviour true end-to-end.
+
+### Fixed
+
+- **DOB no longer carves a valid date out of a longer number.** `1/1/19999`
+  previously matched `1/1/1999`, leaking the trailing `9`. Numeric/ISO/written
+  date patterns are now guarded with a trailing `(?!\d)`.
+- **NAME no longer truncates on a double space.** `Name: John  Smith` now
+  captures the full `John  Smith` instead of dropping the surname.
+- **NAME over-fires less.** Values where every word is a common non-name word
+  (`Dear Sir`, `Name: The Customer`, `Service Team`) are now rejected.
+
+### Build & test surface
+
+- Tests: **134 passing** (123 prior + 11 for multilingual labels & fixes)
+- ReDoS scan: 152 patterns, 0 unsafe
+- No new dependencies; identity pack remains opt-in and dependency-free
+
+---
+
 ## 0.3.1 — 2026-05-31
 
 Docs-only patch. **No code changes** — the published API and behaviour are

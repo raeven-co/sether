@@ -49,7 +49,7 @@ credit valid reporters in our changelog and security advisories.
 
 | Version | Supported |
 |---|---|
-| 0.1.x (alpha) | ✓ Yes — we'll patch security issues during alpha |
+| 0.x (current pre-1.0 line) | ✓ Yes — we patch security issues on the latest 0.x release |
 | < 0.1.0 (legacy `redact-ai-stream`) | ✗ No — please upgrade to `@raeven-co/sether` |
 
 Once `1.0.0` ships, we'll commit to supporting the current major version
