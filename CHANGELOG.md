@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.4.1 — 2026-06-06
+
+Docs-only patch. **No code changes** — the published API, detectors, and
+behaviour are identical to 0.4.0.
+
+- **README:** replaced the ASCII flow diagram with a rendered before/after
+  redaction image (input → tokenised-to-LLM), served from the repo's
+  `assets/` via an absolute raw-GitHub URL so it renders on both npm and
+  GitHub. The image is referenced by URL, not bundled in the package tarball.
+- Refreshed the status line to 0.4.x.
+
 ## 0.4.0 — 2026-06-04
 
 Minor release: the identity pack now recognises labels in **many languages**,

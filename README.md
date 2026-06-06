@@ -10,14 +10,9 @@ IBAN, IP addresses), swaps each match for a stable token before the request
 leaves your boundary, then restores the original values transparently in
 the response.
 
-```text
-   ┌──────────┐    ① raw text + PII    ┌─────────┐    ② tokenised text    ┌─────────┐
-   │ Your app │ ─────────────────────▶ │ Sether  │ ─────────────────────▶ │   LLM   │
-   │          │ ◀───────────────────── │ (local) │ ◀───────────────────── │ (OpenAI │
-   └──────────┘    ④ restored text     └─────────┘    ③ tokenised reply   │  etc.)  │
-                                                                          └─────────┘
-                                       Token vault stays in YOUR infra.
-```
+![Sether redacts PII locally before it reaches the LLM: the input "Hi, this is Amara Okafor — my account email is amara.okafor@acme.com … card 4242 4242 4242 4242 … call me at +1 (415) 555-2671 … SSN 123-45-6789" becomes "Hi, this is &lt;NAME&gt; — my account email is &lt;EMAIL&gt; … card &lt;CC&gt; … &lt;PHONE&gt; … &lt;SSN&gt;". The token vault stays in your infrastructure and restore() swaps the originals back into the reply.](https://raw.githubusercontent.com/raeven-co/sether/main/assets/sether-redaction.png)
+
+*Your app → **Sether** redacts locally → LLM. The token vault stays in your infrastructure; `restore()` swaps the originals back into the reply.*
 
 Three lines of TypeScript to wire it up. Works with **OpenAI, Anthropic,
 Cohere, Mistral, Google Gemini, AWS Bedrock, Azure OpenAI, Together,
@@ -25,7 +20,7 @@ Groq, Ollama**, your own fine-tunes — anything that speaks HTTP and
 streams text. Sether doesn't care who's on the other end; it operates on
 the text stream.
 
-**Status:** `0.3.0` — opt-in identity pack (names, DOB, passport, address), secrets pack, SSE/JSON-stream mode, audit events, and drop-in middlewares for Express / fetch / OpenAI / Anthropic.
+**Status:** `0.4.1` — opt-in identity pack with multilingual labels (names, DOB, passport, address), secrets pack, SSE/JSON-stream mode, audit events, and drop-in middlewares for Express / fetch / OpenAI / Anthropic.
 A product of **[Raeven, Inc.](https://admin.raevenmarket.com.ng)**
 
 ---
