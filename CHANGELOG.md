@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.5.0 — 2026-06-09
+
+### Added — browser-safe entry (`@raeven-co/sether/browser`)
+
+A new subpath export that ships **only the pure detection surface** — the basic,
+secrets, and identity detector packs, their types, and `DEFAULT_REGULATION_MAPPINGS`
+— with **no `node:stream` / `node:crypto` imports**. The package root still pulls
+Node built-ins for the streaming transforms, so it can't be bundled for the
+browser; this entry can.
+
+```ts
+import { basicDetectors, secretsDetectors, identityDetectors } from '@raeven-co/sether/browser';
+const matches = [...basicDetectors, ...identityDetectors].flatMap((d) => d.detect(text));
+```
+
+This lets the browser sandbox and the Sether Shield extension consume the **same
+detection logic as the Node package** instead of maintaining hand-ported copies
+that drift out of sync. **No change to the package root** — `new Sether()` and all
+existing imports behave exactly as in 0.4.x.
+
+### Notes
+
+- ReDoS scan: **PASS** — 161 regex literals scanned, 0 unsafe (`safe-regex2`).
+- Tests: **134 passing** across 12 files — unchanged from 0.4.x (additive release).
+- Dual-export verified for both entries: root (36 keys, ESM === CJS) and `./browser`
+  (23 keys, resolves for both `import` and `require`). `dist/browser.js` carries no
+  `node:stream` / `node:crypto`.
+- Artifact sizes: `dist/index.js` ≈ 36.6 KB, `dist/browser.js` ≈ 19.1 KB.
+- Node tested: 18 / 20 / 22 (CI matrix).
+
 ## 0.4.1 — 2026-06-06
 
 Docs-only patch. **No code changes** — the published API, detectors, and
