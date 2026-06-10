@@ -5,8 +5,7 @@
 If you've found a security vulnerability in Sether, **please do not file a
 public GitHub issue**. Instead, report it privately to either:
 
-- **Email:** `security@raeven.co`
-- **Backup:** `godfrey@raeven.co`
+- **Email:** `emorylebo@gmail.com`
 
 GitHub's private security advisories are also acceptable: navigate to the
 **Security** tab of this repository and select *"Report a vulnerability."*
@@ -39,7 +38,7 @@ credit valid reporters in our changelog and security advisories.
 
 ## What's out of scope (handled separately)
 
-- The Sether hosted SaaS gateway (report via the SaaS dashboard or `security@raeven.co`)
+- The Sether hosted SaaS gateway (report via the SaaS dashboard or `emorylebo@gmail.com`)
 - The marketing site at <https://sether.raevenmarket.com.ng> and its mirror at <https://setherai.vercel.app/#sandbox>
 - Issues in upstream dependencies that we don't directly own
 - Issues that require physical access to a user's machine
@@ -78,4 +77,4 @@ higher bar:
 
 Thanks for helping keep Sether's users safe.
 
-— Godfrey Lebo · Raeven, Inc.
+— Godfrey Lebo · Raeven Company LTD

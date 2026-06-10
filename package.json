@@ -1,6 +1,6 @@
 {
   "name": "@raeven-co/sether",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Streaming PII redaction for AI applications. The hiding place for sensitive data flowing into LLMs. Secrets pack, SSE-aware streaming, audit events, drop-in middlewares for Express / fetch / OpenAI / Anthropic.",
   "type": "module",
   "sideEffects": false,
@@ -56,7 +56,7 @@
     "agentic",
     "mcp"
   ],
-  "author": "Godfrey Lebo <emorylebo@gmail.com> (Raeven, Inc.)",
+  "author": "Godfrey Lebo <emorylebo@gmail.com> (Raeven Company LTD)",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -65,7 +65,7 @@
   "homepage": "https://setherai.vercel.app/#sandbox",
   "bugs": {
     "url": "https://github.com/raeven-co/sether/issues",
-    "email": "security@raeven.co"
+    "email": "emorylebo@gmail.com"
   },
   "funding": {
     "type": "github",

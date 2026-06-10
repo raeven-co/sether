@@ -20,8 +20,8 @@ Groq, Ollama**, your own fine-tunes — anything that speaks HTTP and
 streams text. Sether doesn't care who's on the other end; it operates on
 the text stream.
 
-**Status:** `0.4.1` — opt-in identity pack with multilingual labels (names, DOB, passport, address), secrets pack, SSE/JSON-stream mode, audit events, and drop-in middlewares for Express / fetch / OpenAI / Anthropic.
-A product of **[Raeven, Inc.](https://admin.raevenmarket.com.ng)**
+**Status:** `0.5.1` — browser-safe `@raeven-co/sether/browser` entry, opt-in identity pack with multilingual labels (names, DOB, passport, address), secrets pack, SSE/JSON-stream mode, audit events, and drop-in middlewares for Express / fetch / OpenAI / Anthropic.
+A product of **[Raeven Company LTD](https://admin.raevenmarket.com.ng)**
 
 ---
 
@@ -411,11 +411,11 @@ Track progress: <https://github.com/raeven-co/sether>
 
 ## License
 
-MIT © Godfrey Lebo / Raeven, Inc.
+MIT © Godfrey Lebo / Raeven Company LTD
 
 ## Reporting security issues
 
-Email `security@raeven.co` (or `godfrey@raeven.co` as a backup).
+Email `emorylebo@gmail.com`.
 **Do not** file public GitHub issues for security findings. See
 [SECURITY.md](./SECURITY.md) for the full policy.
 

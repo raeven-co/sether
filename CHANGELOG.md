@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.5.1 — 2026-06-10
+
+Docs / metadata patch. **No code changes** — the published API, detectors, and
+behaviour are identical to 0.5.0.
+
+- Corrected the operating entity from "Raeven, Inc." to **Raeven Company LTD**
+  (registered in Nigeria) across the README, SECURITY.md, LICENSE, and package
+  metadata.
+- Updated the security / contact email to `emorylebo@gmail.com` (README,
+  SECURITY.md, and `bugs.email`).
+
 ## 0.5.0 — 2026-06-09
 
 ### Added — browser-safe entry (`@raeven-co/sether/browser`)
