@@ -1,6 +1,6 @@
 {
   "name": "@raeven-co/sether",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "Streaming PII redaction for AI applications. The hiding place for sensitive data flowing into LLMs. Secrets pack, SSE-aware streaming, audit events, drop-in middlewares for Express / fetch / OpenAI / Anthropic.",
   "type": "module",
   "sideEffects": false,
@@ -33,9 +33,10 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint src test --max-warnings 0",
     "check:regex": "node scripts/check-regex-safety.mjs",
+    "check:ascii": "node scripts/check-ascii-dist.mjs",
     "format": "prettier --write src test",
     "format:check": "prettier --check src test",
-    "prepublishOnly": "npm run typecheck && npm run lint && npm run check:regex && npm test && npm run build"
+    "prepublishOnly": "npm run typecheck && npm run lint && npm run check:regex && npm test && npm run build && npm run check:ascii"
   },
   "keywords": [
     "ai",

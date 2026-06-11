@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.5.2 — 2026-06-11
+
+Supply-chain hardening patch. **No API or behaviour change** — detectors,
+multilingual coverage, and all matches are byte-for-byte identical to 0.5.1.
+
+### Fixed — ASCII-only published bundles (Socket.dev Supply Chain Security)
+
+The multilingual identity labels added in 0.4.0 embedded raw non-ASCII
+characters — including right-to-left Arabic script — directly in the shipped
+`dist/*.js` and `dist/*.cjs`. Static supply-chain scanners flag raw non-ASCII
+/ bidirectional Unicode in code as a "Trojan Source" risk (CVE-2021-42574),
+which lowered the package's Supply Chain Security score.
+
+The label regexes now use `\uXXXX` escape sequences for every non-ASCII code
+point. The regex engine sees the **same code points**, so detection of CJK,
+Cyrillic, Arabic, and accented-Latin labels is unchanged (verified by the
+multilingual test suite) — but the shipped JavaScript is now pure ASCII.
+
+### Added — `check:ascii` build gate
+
+`scripts/check-ascii-dist.mjs` fails the build (wired into `prepublishOnly`)
+if any shipped bundle contains a non-ASCII byte, so this can't silently
+regress. The bundler is also configured with `charset: 'ascii'`.
+
+### Build & test surface
+
+- Tests: **134 passing** (unchanged)
+- ReDoS scan: 161 patterns, 0 unsafe
+- All four shipped bundles verified 0 non-ASCII characters
+
 ## 0.5.1 — 2026-06-10
 
 Docs / metadata patch. **No code changes** — the published API, detectors, and

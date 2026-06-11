@@ -77,7 +77,7 @@ const NAME_LABEL_RE =
   /\b(?:full[\s_-]?name|first[\s_-]?name|last[\s_-]?name|name|nom|nombre|nome|naam|navn|patient|customer|client|contact|cardholder|account[\s_-]?holder|beneficiary|attn|attention|dear|mr|mrs|ms|mx|dr|prof)\b[\s:.=_-]{0,3}/gi;
 
 // Non-Latin labels — anchored on a trailing colon (ASCII or fullwidth).
-const NAME_LABEL_INTL_RE = /(?:名前|氏名|姓名|이름|성명|имя|الاسم)\s*[:：]\s*/gi;
+const NAME_LABEL_INTL_RE = /(?:\u540D\u524D|\u6C0F\u540D|\u59D3\u540D|\uC774\uB984|\uC131\uBA85|\u0438\u043C\u044F|\u0627\u0644\u0627\u0633\u0645)\s*[:\uFF1A]\s*/gi;
 
 const NAME_LABELS = [NAME_LABEL_RE, NAME_LABEL_INTL_RE] as const;
 
@@ -117,7 +117,7 @@ function captureName(text: string, pos: number): string | null {
         j++;
         continue;
       }
-      if ((c === "'" || c === '’' || c === '-') && j + 1 < text.length && isLetter(text[j + 1] as string)) {
+      if ((c === "'" || c === '\u2019' || c === '-') && j + 1 < text.length && isLetter(text[j + 1] as string)) {
         j++;
         continue;
       }
@@ -161,7 +161,7 @@ export const nameDetector: Detector = {
 const DOB_LABEL_RE =
   /\b(?:date\s+of\s+birth|date\s+de\s+naissance|fecha\s+de\s+nacimiento|data\s+de\s+nascimento|geburtsdatum|geboortedatum|d\.?o\.?b\.?|birth\s?date|born)\b[\s:=-]{0,3}/gi;
 
-const DOB_LABEL_INTL_RE = /(?:生年月日|出生日期|出生日|생년월일|дата\s+рождения)\s*[:：]\s*/gi;
+const DOB_LABEL_INTL_RE = /(?:\u751F\u5E74\u6708\u65E5|\u51FA\u751F\u65E5\u671F|\u51FA\u751F\u65E5|\uC0DD\uB144\uC6D4\uC77C|\u0434\u0430\u0442\u0430\s+\u0440\u043E\u0436\u0434\u0435\u043D\u0438\u044F)\s*[:\uFF1A]\s*/gi;
 
 const DOB_LABELS = [DOB_LABEL_RE, DOB_LABEL_INTL_RE] as const;
 
@@ -249,7 +249,7 @@ export const dobDetector: Detector = {
 const PASSPORT_LABEL_RE =
   /\b(?:passport|passeport|pasaporte|reisepass|passaporto|paspoort|passaporte)(?:\s(?:no|number|num|#))?\b[\s:.#=-]{0,3}/gi;
 
-const PASSPORT_LABEL_INTL_RE = /(?:パスポート|护照|여권|паспорт)\s*[:：#]?\s*/gi;
+const PASSPORT_LABEL_INTL_RE = /(?:\u30D1\u30B9\u30DD\u30FC\u30C8|\u62A4\u7167|\uC5EC\uAD8C|\u043F\u0430\u0441\u043F\u043E\u0440\u0442)\s*[:\uFF1A#]?\s*/gi;
 
 const PASSPORT_LABELS = [PASSPORT_LABEL_RE, PASSPORT_LABEL_INTL_RE] as const;
 
@@ -280,7 +280,7 @@ export const passportDetector: Detector = {
 const ADDRESS_LABEL_RE =
   /\b(?:(?:shipping|billing|mailing|home|residential)\s)?(?:address|adresse|adres|direccion|indirizzo|endereco)(?:es)?\b[\s:.=-]{0,3}/gi;
 
-const ADDRESS_LABEL_INTL_RE = /(?:住所|地址|주소|адрес|dirección|endereço)\s*[:：]\s*/gi;
+const ADDRESS_LABEL_INTL_RE = /(?:\u4F4F\u6240|\u5730\u5740|\uC8FC\uC18C|\u0430\u0434\u0440\u0435\u0441|direcci\u00F3n|endere\u00E7o)\s*[:\uFF1A]\s*/gi;
 
 const ADDRESS_LABELS = [ADDRESS_LABEL_RE, ADDRESS_LABEL_INTL_RE] as const;
 
