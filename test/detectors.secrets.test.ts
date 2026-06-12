@@ -114,9 +114,7 @@ describe('openaiKeyDetector', () => {
 
 describe('anthropicKeyDetector', () => {
   it('matches api03 prefix', () => {
-    const m = anthropicKeyDetector.detect(
-      'ANTHROPIC_API_KEY=' + 'sk-ant-' + 'api03-' + a(50),
-    );
+    const m = anthropicKeyDetector.detect('ANTHROPIC_API_KEY=' + 'sk-ant-' + 'api03-' + a(50));
     expect(m).toHaveLength(1);
   });
 
@@ -142,9 +140,7 @@ describe('githubPatDetector', () => {
   });
 
   it('matches fine-grained github_pat_ token', () => {
-    const m = githubPatDetector.detect(
-      'GH_FG=' + 'github_pat_' + A(22) + '_' + 'b'.repeat(59),
-    );
+    const m = githubPatDetector.detect('GH_FG=' + 'github_pat_' + A(22) + '_' + 'b'.repeat(59));
     expect(m).toHaveLength(1);
   });
 
@@ -203,8 +199,19 @@ describe('highEntropyDetector', () => {
     // High-entropy by construction; doesn't match any vendor's published key
     // pattern, so no risk of scanner flagging.
     const blob =
-      'aB' + D(2) + 'xY' + D(1) + 'zQ' + D(1) + 'mNk' + D(1) + 'vL' + D(1) +
-      'pH' + D(1) + 'wRtJfDgEsCvBxMqOnAhUi';
+      'aB' +
+      D(2) +
+      'xY' +
+      D(1) +
+      'zQ' +
+      D(1) +
+      'mNk' +
+      D(1) +
+      'vL' +
+      D(1) +
+      'pH' +
+      D(1) +
+      'wRtJfDgEsCvBxMqOnAhUi';
     const m = highEntropyDetector.detect(`secret=${blob}`);
     expect(m).toHaveLength(1);
   });
@@ -215,7 +222,9 @@ describe('highEntropyDetector', () => {
   });
 
   it('rejects short strings under 32 chars', () => {
-    expect(highEntropyDetector.detect('aB' + D(2) + 'xY' + D(1) + 'zQ' + D(1) + 'm')).toHaveLength(0);
+    expect(highEntropyDetector.detect('aB' + D(2) + 'xY' + D(1) + 'zQ' + D(1) + 'm')).toHaveLength(
+      0,
+    );
   });
 
   it('rejects strings with no digits', () => {

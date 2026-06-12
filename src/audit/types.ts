@@ -37,7 +37,17 @@ export interface AuditEvent {
 }
 
 export interface RegulationMapping {
-  framework: 'GDPR' | 'SOC2' | 'HIPAA' | 'EU_AI_ACT' | 'NDPA' | 'CCPA' | 'PCI_DSS' | 'ISO_27001' | 'OWASP_LLM' | 'OWASP_AGENTIC';
+  framework:
+    | 'GDPR'
+    | 'SOC2'
+    | 'HIPAA'
+    | 'EU_AI_ACT'
+    | 'NDPA'
+    | 'CCPA'
+    | 'PCI_DSS'
+    | 'ISO_27001'
+    | 'OWASP_LLM'
+    | 'OWASP_AGENTIC';
   reference: string; // e.g. "Art. 28", "CC6.7", "§164.312", "§10"
 }
 
@@ -48,7 +58,9 @@ export interface AuditSink {
 
 // Default regulation mappings per detector type. Keep this lean — every entry
 // here must be defensible against the actual regulation text.
-export const DEFAULT_REGULATION_MAPPINGS: Readonly<Record<string, ReadonlyArray<RegulationMapping>>> = {
+export const DEFAULT_REGULATION_MAPPINGS: Readonly<
+  Record<string, ReadonlyArray<RegulationMapping>>
+> = {
   EMAIL: [
     { framework: 'GDPR', reference: 'Art. 28' },
     { framework: 'SOC2', reference: 'CC6.7' },

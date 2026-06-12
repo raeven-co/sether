@@ -77,7 +77,9 @@ describe('wrapOpenAI', () => {
       ],
     });
 
-    const seen = getSeen() as { messages: Array<{ content: Array<{ type: string; text?: string }> }> };
+    const seen = getSeen() as {
+      messages: Array<{ content: Array<{ type: string; text?: string }> }>;
+    };
     const parts = seen.messages[0]!.content;
     expect(parts[0]?.text).not.toContain('alice@example.com');
     expect(parts[0]?.text).toMatch(/<EMAIL_/);
@@ -90,6 +92,8 @@ describe('wrapOpenAI', () => {
     const { client } = makeFakeClient();
     const wrapped = wrapOpenAI(client, { detectors: basicDetectors, vault });
     // Should not throw on a request with no messages.
-    await expect(wrapped.chat.completions.create({ model: 'gpt-4', messages: [] })).resolves.toBeDefined();
+    await expect(
+      wrapped.chat.completions.create({ model: 'gpt-4', messages: [] }),
+    ).resolves.toBeDefined();
   });
 });

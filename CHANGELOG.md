@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.5.4 — 2026-06-12
+
+Dev-tooling upgrade to clear Socket.dev / CVE alerts. **No runtime change** —
+the published bundle, the single runtime dependency (`libphonenumber-js`), the
+API, and all detectors are byte-for-byte identical to 0.5.3. Consumers are
+unaffected; only build/test tooling changed.
+
+### Changed — devDependencies upgraded to clear advisories
+
+Socket's repo scan flagged 7 alerts, **all in development dependencies** (none
+shipped to consumers — `npm audit --omit=dev` was already 0). The headline was
+a **Critical CVE in `vitest`** (CVE-2026-47429, test-runner UI server file
+read/exec) plus medium CVEs in transitive `esbuild` / `vite` / `brace-expansion`.
+
+- `vitest` `^2.1.8` → `^4.1.8` (clears the Critical CVE and pulls patched `vite`)
+- `tsup` `^8.3.5` → `^8.5.1` (pulls patched `esbuild`)
+- `typescript-eslint` `^8.20.0` → `^8.61.0`, `eslint` `^9.18.0` → `^10.4.1`,
+  `@eslint/js` → `^10.0.1`
+
+`npm audit` (full tree, including dev) is now **0 vulnerabilities**.
+
+### Build & test surface
+
+- Tests: **134 passing** (vitest 4)
+- ReDoS scan: 161 patterns, 0 unsafe; bundles ASCII-only; lint/typecheck clean
+- Runtime dependencies: **1** (`libphonenumber-js`) — unchanged
+
 ## 0.5.3 — 2026-06-11
 
 Supply-chain surface reduction. **No API or behaviour change** — every detector

@@ -69,61 +69,55 @@ describe('isIPv6Address — equivalence with Node net.isIPv6', () => {
     expect(isIPv6Address('::')).toBe(true);
   });
 
-  it(
-    'property: matches Node net.isIPv6 across 4000 fuzzed hex+colon strings (length 4–39)',
-    () => {
-      fc.assert(
-        fc.property(
-          fc
-            .array(
-              fc.constantFrom(
-                '0',
-                '1',
-                '2',
-                '3',
-                '4',
-                '5',
-                '6',
-                '7',
-                '8',
-                '9',
-                'a',
-                'b',
-                'c',
-                'd',
-                'e',
-                'f',
-                'A',
-                'B',
-                'C',
-                'D',
-                'E',
-                'F',
-                ':',
-              ),
-              { minLength: 4, maxLength: 39 },
-            )
-            .map((arr) => arr.join('')),
-          (s) => isIPv6Address(s) === nodeIsIPv6(s),
-        ),
-        { numRuns: 4000 },
-      );
-    },
-  );
+  it('property: matches Node net.isIPv6 across 4000 fuzzed hex+colon strings (length 4–39)', () => {
+    fc.assert(
+      fc.property(
+        fc
+          .array(
+            fc.constantFrom(
+              '0',
+              '1',
+              '2',
+              '3',
+              '4',
+              '5',
+              '6',
+              '7',
+              '8',
+              '9',
+              'a',
+              'b',
+              'c',
+              'd',
+              'e',
+              'f',
+              'A',
+              'B',
+              'C',
+              'D',
+              'E',
+              'F',
+              ':',
+            ),
+            { minLength: 4, maxLength: 39 },
+          )
+          .map((arr) => arr.join('')),
+        (s) => isIPv6Address(s) === nodeIsIPv6(s),
+      ),
+      { numRuns: 4000 },
+    );
+  });
 
-  it(
-    'property: matches Node net.isIPv6 across 2000 fully random strings (most rejected by both)',
-    () => {
-      fc.assert(
-        fc.property(fc.string({ minLength: 0, maxLength: 50 }), (s) => {
-          // Outside the candidate domain Node may accept IPv4-in-IPv6
-          // (which we don't). Restrict the property to inputs that
-          // can't contain dots so equivalence holds.
-          if (s.includes('.')) return true;
-          return isIPv6Address(s) === nodeIsIPv6(s);
-        }),
-        { numRuns: 2000 },
-      );
-    },
-  );
+  it('property: matches Node net.isIPv6 across 2000 fully random strings (most rejected by both)', () => {
+    fc.assert(
+      fc.property(fc.string({ minLength: 0, maxLength: 50 }), (s) => {
+        // Outside the candidate domain Node may accept IPv4-in-IPv6
+        // (which we don't). Restrict the property to inputs that
+        // can't contain dots so equivalence holds.
+        if (s.includes('.')) return true;
+        return isIPv6Address(s) === nodeIsIPv6(s);
+      }),
+      { numRuns: 2000 },
+    );
+  });
 });

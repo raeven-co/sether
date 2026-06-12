@@ -34,9 +34,7 @@ describe('wrapAnthropic', () => {
     const reply = (await wrapped.messages.create({
       model: 'claude-opus-4-7',
       max_tokens: 1024,
-      messages: [
-        { role: 'user', content: 'Reach out to bob@example.org about SSN 123-45-6789' },
-      ],
+      messages: [{ role: 'user', content: 'Reach out to bob@example.org about SSN 123-45-6789' }],
     })) as { content: Array<{ type: string; text: string }> };
 
     const seen = getSeen() as { messages: Array<{ content: string }> };

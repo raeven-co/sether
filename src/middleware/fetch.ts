@@ -63,10 +63,7 @@ export function wrapFetch(opts: WrapFetchOptions): typeof fetch {
   }) as typeof fetch;
 }
 
-async function redactRequestBody(
-  init: RequestInit,
-  opts: WrapFetchOptions,
-): Promise<RequestInit> {
+async function redactRequestBody(init: RequestInit, opts: WrapFetchOptions): Promise<RequestInit> {
   if (init.body === null || init.body === undefined) return init;
   if (typeof init.body !== 'string') return init; // pass through Blob/FormData/etc
 
