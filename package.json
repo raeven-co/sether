@@ -1,6 +1,6 @@
 {
   "name": "@raeven-co/sether",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "description": "Streaming PII redaction for AI applications. The hiding place for sensitive data flowing into LLMs. Secrets pack, SSE-aware streaming, audit events, drop-in middlewares for Express / fetch / OpenAI / Anthropic.",
   "type": "module",
   "sideEffects": false,
@@ -77,18 +77,6 @@
   },
   "dependencies": {
     "libphonenumber-js": "^1.11.20"
-  },
-  "peerDependencies": {
-    "openai": ">=4.0.0",
-    "@anthropic-ai/sdk": ">=0.30.0"
-  },
-  "peerDependenciesMeta": {
-    "openai": {
-      "optional": true
-    },
-    "@anthropic-ai/sdk": {
-      "optional": true
-    }
   },
   "devDependencies": {
     "@eslint/js": "^9.18.0",

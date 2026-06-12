@@ -20,7 +20,7 @@ Groq, Ollama**, your own fine-tunes — anything that speaks HTTP and
 streams text. Sether doesn't care who's on the other end; it operates on
 the text stream.
 
-**Status:** `0.5.2` — browser-safe `@raeven-co/sether/browser` entry, opt-in identity pack with multilingual labels (names, DOB, passport, address), secrets pack, SSE/JSON-stream mode, audit events, and drop-in middlewares for Express / fetch / OpenAI / Anthropic.
+**Status:** `0.5.3` — browser-safe `@raeven-co/sether/browser` entry, opt-in identity pack with multilingual labels (names, DOB, passport, address), secrets pack, SSE/JSON-stream mode, audit events, and drop-in middlewares for Express / fetch / OpenAI / Anthropic.
 A product of **[Raeven Company LTD](https://admin.raevenmarket.com.ng)**
 
 ---
@@ -344,7 +344,7 @@ const app = express();
 app.use(express.json());
 app.use(createExpressMiddleware({ detectors: sether.detectors, vault: sether.vault }));
 
-// OpenAI SDK (peer dep — install `openai` separately)
+// OpenAI SDK — bring your own client (Sether never imports `openai`)
 import OpenAI from 'openai';
 import { wrapOpenAI } from '@raeven-co/sether';
 const openai = wrapOpenAI(new OpenAI({ apiKey }), {
@@ -352,7 +352,7 @@ const openai = wrapOpenAI(new OpenAI({ apiKey }), {
   vault: sether.vault,
 });
 
-// Anthropic SDK (peer dep — install `@anthropic-ai/sdk` separately)
+// Anthropic SDK — bring your own client (Sether never imports `@anthropic-ai/sdk`)
 import Anthropic from '@anthropic-ai/sdk';
 import { wrapAnthropic } from '@raeven-co/sether';
 const anthropic = wrapAnthropic(new Anthropic({ apiKey }), {
@@ -361,7 +361,12 @@ const anthropic = wrapAnthropic(new Anthropic({ apiKey }), {
 });
 ```
 
-`openai` and `@anthropic-ai/sdk` are **optional peer dependencies** — users who don't import the wrappers pay zero install cost.
+The wrappers are **structurally typed** — Sether never imports `openai` or
+`@anthropic-ai/sdk` (not at runtime, not as a type). You pass your own client
+instance; any object matching the `chat.completions.create` /
+`messages.create` shape works. They are **not** declared as dependencies or
+peer dependencies, so Sether's install footprint stays a single package
+(`libphonenumber-js`) and its supply-chain surface stays minimal.
 
 ### Audit-event schema
 

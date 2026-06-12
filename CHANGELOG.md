@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.5.3 — 2026-06-11
+
+Supply-chain surface reduction. **No API or behaviour change** — every detector
+and both SDK wrappers work exactly as before.
+
+### Removed — `openai` / `@anthropic-ai/sdk` peer dependencies
+
+The `wrapOpenAI` / `wrapAnthropic` middlewares are **structurally typed**
+(`interface OpenAILike` / `AnthropicLike`) and never import either SDK — at
+runtime, as a type, or as a dev dependency. The `peerDependencies` declaration
+was pure metadata with no code behind it, yet it made supply-chain scanners
+fold two large AI SDKs into Sether's dependency graph.
+
+Dropping the declaration leaves a single declared dependency
+(`libphonenumber-js`). The wrappers are unchanged — pass your own
+`new OpenAI()` / `new Anthropic()` instance (or any client matching the
+`{ chat: { completions: { create } } }` / `{ messages: { create } }` shape)
+exactly as before. Nothing to change in consumer code.
+
+### Build & test surface
+
+- Tests: **134 passing** (unchanged)
+- Declared dependencies: **1** (`libphonenumber-js`), down from 3
+- ReDoS scan: 161 patterns, 0 unsafe; bundles ASCII-only (0.5.2)
+
 ## 0.5.2 — 2026-06-11
 
 Supply-chain hardening patch. **No API or behaviour change** — detectors,
