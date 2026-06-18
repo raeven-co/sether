@@ -1,5 +1,72 @@
 # Changelog
 
+## 0.5.5 — 2026-06-18
+
+Correctness and hardening patch surfaced by an internal pre-release audit.
+**No public API changes** — every export, signature, and type is identical to
+0.5.4, and the redact↔restore round-trip is byte-for-byte unchanged. Three
+behavioural fixes, all in the safe direction, plus supply-chain documentation.
+
+### Fixed — streaming redactor holds back an over-long value at a chunk boundary
+
+The redact stream catches a PII match that crosses a chunk boundary by holding
+back the last `safeDistanceBytes` (256) of each chunk. That guarantee only held
+for values **shorter than** the safe distance. A longer value — in practice a
+JWT or API key from the opt-in `secretsDetectors`, which are whitespace-free and
+routinely 300–800+ chars — has not fully arrived when the chunk prefix is
+emitted, so no detector matches it yet; its head was emitted unredacted, and once
+the head was gone the remainder no longer matched (a headless JWT has no `eyJ`
+prefix). Default `basicDetectors` were unaffected in practice — a valid email is
+≤ 254 bytes.
+
+The redact stream now also refuses to cut inside an in-progress whitespace-free
+run, pulling the emit boundary back to the run's start so the whole candidate is
+re-examined once the rest arrives — bounded by `max(safeDistanceBytes × 4, 8192)`
+bytes so a long whitespace-free blob can't grow the buffer without limit. The
+guard only ever holds back **more**, so round-trip identity and all existing
+detection are unchanged. Regression test added (a 400-char JWT split across the
+boundary). For values larger than the bound, raise `safeDistanceBytes` or use
+`redactSync` (documented under *Streaming safety*).
+
+### Fixed — `wrapFetch` no longer forwards a stale `content-length` / `content-encoding`
+
+`wrapFetch` rebuilds the response after restoring tokens, which changes the body
+length, and reading the body via `.text()` has already decoded any content
+encoding. The rebuilt `Response` previously carried the upstream `content-length`
+and `content-encoding` headers, which then described the wrong bytes (a stale
+`content-encoding: gzip` over now-plaintext is the dangerous one). Both headers
+are dropped from the rebuilt response.
+
+### Fixed — Express middleware keeps `res.send` / `res.json` synchronous
+
+`createExpressMiddleware` wrapped `res.send` / `res.json` as `async` functions,
+so they returned a pending `Promise` instead of `res`. Express does not await
+them and requires `res` for chaining, so this could send an unrestored body or
+trigger a double-send / "headers already sent". Restoration is pure token→value
+substitution, so the wrappers are now synchronous and return `res` as Express
+expects. First tests added for the Express middleware (previously uncovered).
+
+### Documentation
+
+- **Token vault:** replaced the `RedisVault` example, whose `async get()` does
+  not satisfy the **synchronous** `Vault` interface and would silently break
+  `restore()`, with a correct synchronous custom-vault example and an explicit
+  note that `restore()` cannot await per-token lookups.
+- **SECURITY.md:** added a *Supply-chain posture* section — the published tarball
+  contents, the single runtime dependency (`libphonenumber-js`), and why
+  dev-tooling scanner advisories (e.g. on `@typescript-eslint/eslint-plugin` or a
+  transitive `@humanfs/types`) never reach consumers.
+
+### Build & test surface
+
+- Tests: **139 passing** (134 prior + 2 streaming boundary + 3 Express)
+- ReDoS scan: 167 patterns, 0 unsafe; bundles ASCII-only; lint/typecheck clean
+- Runtime dependencies: **1** (`libphonenumber-js`) — unchanged
+- Consumer-facing `npm audit --omit=dev`: **0 vulnerabilities**. One low-severity,
+  dev-only `esbuild` advisory (reachable only via esbuild's dev server on Windows,
+  which Sether never runs) remains in the build toolchain; clearing it requires a
+  major `tsup` / `vitest` bump and is deferred from this patch.
+
 ## 0.5.4 — 2026-06-12
 
 Dev-tooling upgrade to clear Socket.dev / CVE alerts. **No runtime change** —

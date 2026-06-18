@@ -55,21 +55,26 @@ export function createExpressMiddleware(opts: ExpressMiddlewareOptions) {
         req.body = await redactJsonValue(req.body, opts);
       }
 
-      // Wrap res.send + res.json to restore on the way out.
+      // Wrap res.send + res.json to restore on the way out. Restoration is pure
+      // token->value substitution, so it runs synchronously — and it must.
+      // Express requires res.send / res.json to return `res` (for chaining) and
+      // does not await them; an async override returns a pending Promise, so the
+      // real send fires a microtask later and an unrestored body can go out
+      // first or a double-send / "headers already sent" can occur.
       const originalSend = res.send.bind(res);
       const originalJson = res.json.bind(res);
 
-      res.send = async function (body?: unknown) {
+      res.send = function (body?: unknown) {
         if (typeof body === 'string') {
-          body = await pipeThrough(body, opts, 'restore');
+          body = restoreStringSync(body, opts.vault);
         } else if (body && typeof body === 'object') {
-          body = await restoreJsonValue(body, opts);
+          body = restoreJsonValueSync(body, opts.vault);
         }
         return originalSend(body);
       };
-      res.json = async function (body?: unknown) {
+      res.json = function (body?: unknown) {
         if (body && typeof body === 'object') {
-          body = await restoreJsonValue(body, opts);
+          body = restoreJsonValueSync(body, opts.vault);
         }
         return originalJson(body);
       };
@@ -106,13 +111,36 @@ async function pipeThrough(
   });
 }
 
-// Walk JSON values; redact/restore strings in place. Numbers, booleans,
-// nulls pass through.
+// Walk JSON values; redact strings in place. Numbers, booleans, nulls pass
+// through. The request body is already fully buffered by express.json(), so the
+// streaming redactor sees it as a single chunk (no chunk-boundary concern).
 async function redactJsonValue(value: unknown, opts: ExpressMiddlewareOptions): Promise<unknown> {
   return mapJson(value, (s) => pipeThrough(s, opts, 'redact'));
 }
-async function restoreJsonValue(value: unknown, opts: ExpressMiddlewareOptions): Promise<unknown> {
-  return mapJson(value, (s) => pipeThrough(s, opts, 'restore'));
+
+// Synchronous token -> value restoration for the response path, so the wrapped
+// res.send / res.json stay synchronous. Matches the `<TYPE_uuid>` token shape
+// emitted by the redact stream.
+const RESTORE_TOKEN_RE = /<([A-Z_][A-Z0-9_]*)_([0-9a-fA-F-]{8,})>/g;
+
+function restoreStringSync(text: string, vault: Vault): string {
+  return text.replace(RESTORE_TOKEN_RE, (token) => {
+    const value = vault.get(token);
+    return typeof value === 'string' ? value : token;
+  });
+}
+
+function restoreJsonValueSync(value: unknown, vault: Vault): unknown {
+  if (typeof value === 'string') return restoreStringSync(value, vault);
+  if (Array.isArray(value)) return value.map((v) => restoreJsonValueSync(v, vault));
+  if (value && typeof value === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      out[k] = restoreJsonValueSync(v, vault);
+    }
+    return out;
+  }
+  return value;
 }
 
 async function mapJson(value: unknown, mapStr: (s: string) => Promise<string>): Promise<unknown> {

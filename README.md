@@ -20,7 +20,7 @@ Groq, Ollama**, your own fine-tunes — anything that speaks HTTP and
 streams text. Sether doesn't care who's on the other end; it operates on
 the text stream.
 
-**Status:** `0.5.4` — browser-safe `@raeven-co/sether/browser` entry, opt-in identity pack with multilingual labels (names, DOB, passport, address), secrets pack, SSE/JSON-stream mode, audit events, and drop-in middlewares for Express / fetch / OpenAI / Anthropic.
+**Status:** `0.5.5` — browser-safe `@raeven-co/sether/browser` entry, opt-in identity pack with multilingual labels (names, DOB, passport, address), secrets pack, SSE/JSON-stream mode, audit events, and drop-in middlewares for Express / fetch / OpenAI / Anthropic.
 A product of **[Raeven Company LTD](https://admin.raevenmarket.com.ng)**
 
 ---
@@ -207,25 +207,51 @@ const orderIdDetector: Detector = {
 ## Token vault (persistence)
 
 Tokens map back to the original values through a vault. Sether ships with
-an in-memory LRU vault (10 000 entries, 1-hour TTL by default). For
-production, plug in your own backed by Redis, Postgres, or any KV store
-that implements the `Vault` interface.
+an in-memory LRU vault (10 000 entries, 1-hour TTL by default). You can
+implement the `Vault` interface yourself to change eviction, encrypt values
+at rest, or namespace tokens per tenant.
 
 ```ts
 import { Sether, type Vault } from '@raeven-co/sether';
-import type { Redis } from 'ioredis';
 
-class RedisVault implements Vault {
-  constructor(private redis: Redis, private ttlSec = 3600) {}
+// A custom vault implements the synchronous Vault interface. This one wraps a
+// Map and namespaces every token so several tenants can share one store.
+class NamespacedVault implements Vault {
+  readonly #store = new Map<string, string>();
+  readonly #prefix: string;
+  constructor(prefix: string) {
+    this.#prefix = prefix;
+  }
   set(token: string, value: string): void {
-    void this.redis.set(token, value, 'EX', this.ttlSec);
+    this.#store.set(this.#prefix + token, value);
   }
-  async get(token: string): Promise<string | undefined> {
-    return (await this.redis.get(token)) ?? undefined;
+  get(token: string): string | undefined {
+    return this.#store.get(this.#prefix + token);
   }
-  // …has, delete, size, clear
+  has(token: string): boolean {
+    return this.#store.has(this.#prefix + token);
+  }
+  delete(token: string): boolean {
+    return this.#store.delete(this.#prefix + token);
+  }
+  size(): number {
+    return this.#store.size;
+  }
+  clear(): void {
+    this.#store.clear();
+  }
 }
+
+const sether = new Sether({ vault: new NamespacedVault('tenant-42:') });
 ```
+
+**The `Vault` interface is synchronous.** `restore()` runs inside a Node
+streaming `Transform` that substitutes tokens as the bytes flow through, so it
+cannot `await` a lookup per token. A store reached over async I/O (Redis,
+Postgres) therefore can't be dropped straight into `restore()` — front it with
+a synchronous in-process cache that you hydrate before the restore pass, or
+keep the vault in-process. A first-class async vault adapter is on the roadmap
+(see *What's coming*).
 
 The vault stays in **your** process (or your own backing store if you
 implement `Vault`). **This package does not phone home** — streams are not
@@ -245,11 +271,18 @@ This is verified by property-based tests that partition arbitrary text at
 random chunk boundaries and assert the redact→restore round-trip is
 identity (50+ random partitions per CI run).
 
-If you stream very large tokens (custom detectors with long values), bump
-`safeDistanceBytes`:
+**Values longer than `safeDistanceBytes`.** The held-back tail only guarantees
+a boundary-crossing match is caught when the whole value fits inside it. A value
+longer than `safeDistanceBytes` (256) has not fully arrived when the prefix is
+emitted, so no detector matches it yet. As of 0.5.5 the redact stream also holds
+back an in-progress *whitespace-free* run — every long secret (a JWT, an API
+key) is whitespace-free — up to a bound of `max(safeDistanceBytes × 4, 8192)`
+bytes, so such a value is no longer emitted partially across a chunk boundary.
+For values larger than that bound, raise `safeDistanceBytes` (the bound scales
+with it) or redact complete payloads with `redactSync`:
 
 ```ts
-const sether = new Sether({ safeDistanceBytes: 1024 });
+const sether = new Sether({ safeDistanceBytes: 4096 }); // e.g. for large JWTs
 ```
 
 ---
@@ -257,10 +290,10 @@ const sether = new Sether({ safeDistanceBytes: 1024 });
 ## What's verified in this release
 
 - **Streaming-safe:** chunk-boundary round-trip proven by property-based tests
-- **ReDoS-safe:** all regex literals scanned by `safe-regex2` in CI (146 patterns, 0 unsafe)
+- **ReDoS-safe:** all regex literals scanned by `safe-regex2` in CI (161 patterns, 0 unsafe)
 - **TypeScript strict mode:** no `any`, no implicit types
-- **Dual build:** ESM + CJS, ≈ 35 KB each
-- **CI matrix:** Node 18 / 20 / 22 — lint, typecheck, format, regex-safety, 134 tests, build
+- **Dual build:** ESM + CJS, ≈ 36 KB each
+- **CI matrix:** Node 18 / 20 / 22 — lint, typecheck, format, regex-safety, 139 tests, build
 - **MIT licensed** — fork it, audit it, no vendor lock-in
 
 ---
@@ -273,6 +306,7 @@ Known limitations in this release:
 - **IPv6 `::1` (loopback) is not detected.** Candidate regex requires 4+ chars. Loopback isn't customer PII, but flag it in your audit logs if it matters for your threat model.
 - **Credit-card regex is permissive.** Anything 13–23 chars of digits/spaces/dashes is a candidate, then validated by Luhn. False positives in dense numeric content are possible.
 - **Names / DOB / passport / address are label-anchored, not free-text NER.** The opt-in identity pack (0.3.0) catches these when they appear with a label or distinctive structure. Unlabelled names / organisations / locations in running prose need the ONNX NER model shipping separately as `@raeven-co/sether-ner`.
+- **Very large whitespace-free values split across chunk boundaries.** The streaming redactor holds an in-progress value back up to `max(safeDistanceBytes × 4, 8192)` bytes; a single value larger than that bound, split across two chunks, can still be emitted partially. Raise `safeDistanceBytes` or use `redactSync` on complete payloads. See [Streaming safety](#streaming-safety).
 - **No production benchmarks yet.** Throughput numbers (vs Microsoft Presidio) will land alongside the NER package.
 
 ---

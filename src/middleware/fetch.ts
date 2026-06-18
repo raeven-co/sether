@@ -85,10 +85,20 @@ async function wrapResponse(response: Response, opts: WrapFetchOptions): Promise
   const original = await response.text();
   const restored = await streamRoundTrip(original, opts, 'restore');
 
+  // Restoration changes the body length, and reading it via `.text()` has
+  // already decoded any transfer/content encoding. Carrying the upstream
+  // `content-length` / `content-encoding` forward would describe the *old*
+  // bytes and mislead any consumer or proxy that trusts those headers (a
+  // stale `content-encoding: gzip` on now-plaintext is the dangerous one).
+  // Drop both so the rebuilt Response stays self-consistent.
+  const headers = new Headers(response.headers);
+  headers.delete('content-length');
+  headers.delete('content-encoding');
+
   return new Response(restored, {
     status: response.status,
     statusText: response.statusText,
-    headers: response.headers,
+    headers,
   });
 }
 

@@ -72,6 +72,31 @@ function processChunk(
   const matches = detectAll(text, detectors);
   let cut = text.length - safeDistance;
 
+  // Long-value guard. A value longer than `safeDistance` that is still
+  // streaming in produces NO detector match yet — e.g. a JWT or API key split
+  // across chunks. The straddle loop below only holds back *detected* matches,
+  // so the unmatched head of such a value would otherwise be emitted
+  // unredacted, and once its head is gone the remainder no longer matches (a
+  // headless JWT has no `eyJ` prefix) so it never redacts. Every long
+  // secret/email is whitespace-free, so if `cut` lands inside a run of
+  // non-whitespace bytes, pull back to that run's start and re-examine the
+  // whole candidate once the rest arrives. Bounded by `maxBuffered` so a long
+  // whitespace-free blob can't grow the held-back buffer without limit (it
+  // falls back to the original cut and the documented residual). This only ever
+  // holds back *more*, so it cannot split a value or change the round-trip.
+  if (cut > 0 && cut < text.length && !isWhitespace(text[cut - 1]) && !isWhitespace(text[cut])) {
+    const maxBuffered = Math.max(safeDistance * 4, 8192);
+    let runStart = cut;
+    while (runStart > 0 && !isWhitespace(text[runStart - 1])) runStart--;
+    if (text.length - runStart <= maxBuffered) {
+      cut = runStart;
+    }
+  }
+
+  // Straddle guard. Never split a *detected* match across the cut. Runs after
+  // the long-value guard so that a space-containing match (credit card, IBAN)
+  // straddling the pulled-back cut is moved fully into the held-back buffer
+  // rather than partially emitted.
   for (const m of matches) {
     if (m.start < cut && m.end > cut) {
       cut = Math.min(cut, m.start);
@@ -104,6 +129,12 @@ function detectAll(text: string, detectors: readonly Detector[]): DetectedMatch[
     }
   }
   return resolved;
+}
+
+// ASCII whitespace test used by the long-value boundary guard. `undefined`
+// (out-of-range index under noUncheckedIndexedAccess) counts as non-whitespace.
+function isWhitespace(ch: string | undefined): boolean {
+  return ch === ' ' || ch === '\t' || ch === '\n' || ch === '\r' || ch === '\f' || ch === '\v';
 }
 
 function redactRange(
