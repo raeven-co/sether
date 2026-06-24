@@ -20,7 +20,7 @@ Groq, Ollama**, your own fine-tunes — anything that speaks HTTP and
 streams text. Sether doesn't care who's on the other end; it operates on
 the text stream.
 
-**Status:** `0.5.5` — browser-safe `@raeven-co/sether/browser` entry, opt-in identity pack with multilingual labels (names, DOB, passport, address), secrets pack, SSE/JSON-stream mode, audit events, and drop-in middlewares for Express / fetch / OpenAI / Anthropic.
+**Status:** `0.5.6` — browser-safe `@raeven-co/sether/browser` entry, opt-in identity pack with multilingual labels (names, DOB, passport, address), secrets pack, SSE/JSON-stream mode, audit events, and drop-in middlewares for Express / fetch / OpenAI / Anthropic.
 A product of **[Raeven Company LTD](https://admin.raevenmarket.com.ng)**
 
 ---
@@ -293,7 +293,7 @@ const sether = new Sether({ safeDistanceBytes: 4096 }); // e.g. for large JWTs
 - **ReDoS-safe:** all regex literals scanned by `safe-regex2` in CI (161 patterns, 0 unsafe)
 - **TypeScript strict mode:** no `any`, no implicit types
 - **Dual build:** ESM + CJS, ≈ 36 KB each
-- **CI matrix:** Node 18 / 20 / 22 — lint, typecheck, format, regex-safety, 139 tests, build
+- **CI matrix:** Node 18 / 20 / 22 — lint, typecheck, format, regex-safety, 143 tests, build
 - **MIT licensed** — fork it, audit it, no vendor lock-in
 
 ---
@@ -412,9 +412,21 @@ import { ConsoleAuditSink, MemoryAuditSink, DEFAULT_REGULATION_MAPPINGS } from '
 
 `ConsoleAuditSink` writes JSONL to stderr. `MemoryAuditSink` accumulates events for tests and the browser sandbox. **The original value is never carried in an event — only its length.** Persistence (Postgres / D1 / SIEM export) lives in the hosted Pro tier; the schema is the same on both sides so promoting from local-only to hosted doesn't reshape events.
 
-### `redactSync(text, { detectors, vault })`
+### `redactSync(text, { detectors, vault })` / `restoreSync(text, { vault })`
 
-Synchronous one-shot redaction for cases where you have the full text in hand (a JSON field, a log line, an SSE payload) and don't need chunk-boundary buffering. Use `createRedactStream` for input that may span chunk boundaries.
+Synchronous one-shot redaction and restoration for cases where you have the full text in hand (a JSON field, a log line, an SSE payload) and don't need chunk-boundary buffering. `restoreSync` is the mirror of `redactSync`: it swaps `<TYPE_…>` tokens back to their originals via the vault, leaving any token with no vault entry untouched.
+
+```ts
+import { redactSync, restoreSync, basicDetectors, MemoryVault } from '@raeven-co/sether';
+
+const vault = new MemoryVault();
+const safe = redactSync('email alice@example.com', { detectors: basicDetectors, vault });
+// → 'email <EMAIL_…>'
+const back = restoreSync(safe, { vault });
+// → 'email alice@example.com'
+```
+
+Use `createRedactStream` / `createRestoreStream` for input that may span chunk boundaries.
 
 ---
 

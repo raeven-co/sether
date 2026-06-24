@@ -1,5 +1,41 @@
 # Changelog
 
+## 0.5.6 — 2026-06-24
+
+Additive convenience release. **No breaking changes** — every existing export and
+behaviour is unchanged. This fills the obvious gap that `redactSync` shipped
+without a synchronous counterpart.
+
+### Added — `restoreSync(text, { vault })`
+
+The synchronous one-shot mirror of `redactSync`: it swaps every `<TYPE_uuid>`
+token in a complete string back to its original value via the vault, with no
+chunk-boundary buffering. Use it when you hold the whole text in hand (a JSON
+field, a log line, a single SSE payload); reach for `createRestoreStream` when
+tokens may span chunk boundaries. A token with no vault entry (expired, evicted,
+or from a different vault) is returned untouched.
+
+```ts
+import { redactSync, restoreSync, basicDetectors, MemoryVault } from '@raeven-co/sether';
+const vault = new MemoryVault();
+const safe = redactSync('email alice@example.com', { detectors: basicDetectors, vault });
+const back = restoreSync(safe, { vault }); // -> 'email alice@example.com'
+```
+
+### Changed — restore hardened against non-string vault returns
+
+The streaming restore and the new `restoreSync` now substitute a token only when
+`Vault.get()` returns a string, matching every other restore path in the package.
+A vault that returns a non-string (for example a mistakenly async `get()`) now
+leaves the token in place instead of inserting `[object Promise]`. No change for
+the documented synchronous `Vault` contract.
+
+### Build & test surface
+
+- Tests: **143 passing** (139 prior + 4 for `restoreSync`)
+- ReDoS scan: 167 patterns, 0 unsafe; bundles ASCII-only; lint/typecheck clean
+- Runtime dependencies: **1** (`libphonenumber-js`) — unchanged
+
 ## 0.5.5 — 2026-06-18
 
 Correctness and hardening patch surfaced by an internal pre-release audit.
