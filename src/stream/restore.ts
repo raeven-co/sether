@@ -74,5 +74,31 @@ function process(
 }
 
 function replaceTokens(text: string, vault: Vault): string {
-  return text.replace(TOKEN_PATTERN, (token) => vault.get(token) ?? token);
+  return text.replace(TOKEN_PATTERN, (token) => {
+    // Substitute only when the vault returns a string. A vault that returns a
+    // non-string (e.g. a mistakenly async `get()` yielding a Promise) leaves
+    // the token in place instead of inserting `[object Promise]`. No change for
+    // the documented synchronous `Vault` contract; matches every other restore
+    // path in the package.
+    const value = vault.get(token);
+    return typeof value === 'string' ? value : token;
+  });
+}
+
+/**
+ * Synchronous one-shot restoration of a complete text fragment — the mirror of
+ * `redactSync`. Swaps every `<TYPE_uuid>` token back to its original value via
+ * the vault; a token with no vault entry (expired, evicted, or from a different
+ * vault) is left untouched.
+ *
+ * Use when you hold the entire text in hand (a JSON field, a log line, one SSE
+ * payload) and don't need the chunk-boundary buffering of `createRestoreStream`
+ * — which you should use instead when tokens may span chunk boundaries.
+ */
+export interface RestoreSyncOptions {
+  vault: Vault;
+}
+
+export function restoreSync(text: string, opts: RestoreSyncOptions): string {
+  return replaceTokens(text, opts.vault);
 }

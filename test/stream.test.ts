@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { Readable } from 'node:stream';
 import { Sether } from '../src/index.js';
+import { jwtDetector } from '../src/detectors/secrets.js';
 
 async function streamToString(stream: NodeJS.ReadableStream): Promise<string> {
   const chunks: string[] = [];
@@ -79,5 +80,37 @@ describe('Sether streaming', () => {
     expect(redacted).not.toContain('192.168.1.1');
     const restored = await streamToString(Readable.from([redacted]).pipe(sether.restore()));
     expect(restored).toBe(original);
+  });
+
+  it('does not leak a value longer than safeDistanceBytes split across chunks (JWT)', async () => {
+    // A JWT is whitespace-free and routinely longer than the 256-byte default
+    // safe distance. While it is still streaming in it matches no detector, so
+    // an earlier implementation emitted its head unredacted at the chunk
+    // boundary and the headless remainder never matched again. The long-value
+    // guard must hold the whole candidate back until it is complete.
+    const sether = new Sether({ detectors: [jwtDetector] });
+    const jwt = `eyJ${'a'.repeat(60)}.eyJ${'b'.repeat(300)}.${'c'.repeat(50)}`;
+    const original = `token ${jwt} end`;
+    // Split so the first chunk exceeds safeDistance (256) but the JWT is still
+    // incomplete — the exact condition that used to leak.
+    const splitAt = 330;
+    const chunks = [original.slice(0, splitAt), original.slice(splitAt)];
+
+    const redacted = await streamToString(Readable.from(chunks).pipe(sether.redact()));
+    expect(redacted).not.toContain('eyJ'); // no part of the header/payload leaked
+    expect(redacted).not.toContain(jwt);
+    expect(redacted).toMatch(/<JWT_[0-9a-f-]+>/);
+
+    const restored = await streamToString(Readable.from([redacted]).pipe(sether.restore()));
+    expect(restored).toBe(original);
+  });
+
+  it('stays bounded on a long whitespace-free blob (no infinite buffering)', async () => {
+    // The long-value guard is capped so a whitespace-free blob larger than the
+    // buffer bound falls back to normal emission instead of growing forever.
+    const sether = new Sether();
+    const original = 'x'.repeat(20_000); // no PII, no whitespace, > buffer bound
+    const redacted = await streamToString(Readable.from([original]).pipe(sether.redact()));
+    expect(redacted).toBe(original);
   });
 });
