@@ -1,4 +1,5 @@
 import { Transform, type TransformCallback } from 'node:stream';
+import { TOKEN_RE } from '../token.js';
 import type { Vault } from '../vault/types.js';
 
 export interface RestoreStreamOptions {
@@ -7,11 +8,15 @@ export interface RestoreStreamOptions {
    * Maximum length we'll buffer waiting for a token to complete. If a `<`
    * is followed by more than this many chars without a `>`, we emit it as
    * literal text. Default 128.
+   *
+   * Must comfortably exceed the longest token your detectors produce — a
+   * built-in token is ~45-60 chars (`<TYPE_` + 36-char UUID + `>`). Setting
+   * this below the real token length makes a token split across a chunk
+   * boundary flush as literal text before its `>` arrives, and it can then
+   * never be restored. Don't lower it unless you also shorten token types.
    */
   maxTokenLength?: number;
 }
-
-const TOKEN_PATTERN = /<[A-Z][A-Z0-9_]*_[0-9a-fA-F-]{8,}>/g;
 
 export function createRestoreStream(opts: RestoreStreamOptions): Transform {
   const maxToken = opts.maxTokenLength ?? 128;
@@ -74,7 +79,7 @@ function process(
 }
 
 function replaceTokens(text: string, vault: Vault): string {
-  return text.replace(TOKEN_PATTERN, (token) => {
+  return text.replace(TOKEN_RE, (token) => {
     // Substitute only when the vault returns a string. A vault that returns a
     // non-string (e.g. a mistakenly async `get()` yielding a Promise) leaves
     // the token in place instead of inserting `[object Promise]`. No change for

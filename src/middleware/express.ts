@@ -1,4 +1,5 @@
 import { Readable } from 'node:stream';
+import { TOKEN_RE } from '../token.js';
 import type { Detector } from '../detectors/types.js';
 import type { Vault } from '../vault/types.js';
 import { createRedactStream } from '../stream/redact.js';
@@ -119,12 +120,10 @@ async function redactJsonValue(value: unknown, opts: ExpressMiddlewareOptions): 
 }
 
 // Synchronous token -> value restoration for the response path, so the wrapped
-// res.send / res.json stay synchronous. Matches the `<TYPE_uuid>` token shape
-// emitted by the redact stream.
-const RESTORE_TOKEN_RE = /<([A-Z_][A-Z0-9_]*)_([0-9a-fA-F-]{8,})>/g;
-
+// res.send / res.json stay synchronous. Matches the canonical `<TYPE_uuid>`
+// token shape (shared TOKEN_RE) emitted by the redact stream.
 function restoreStringSync(text: string, vault: Vault): string {
-  return text.replace(RESTORE_TOKEN_RE, (token) => {
+  return text.replace(TOKEN_RE, (token) => {
     const value = vault.get(token);
     return typeof value === 'string' ? value : token;
   });

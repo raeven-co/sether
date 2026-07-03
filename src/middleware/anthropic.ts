@@ -1,4 +1,5 @@
 import { redactSync, type RedactSyncOptions } from '../stream/redact.js';
+import { TOKEN_RE } from '../token.js';
 import type { Vault } from '../vault/types.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -112,7 +113,6 @@ function restoreResponse(res: unknown, vault: Vault): unknown {
 }
 
 function restoreInPlace(text: string, vault: Vault): string {
-  const TOKEN_RE = /<([A-Z_][A-Z0-9_]*)_([0-9a-fA-F-]{8,})>/g;
   return text.replace(TOKEN_RE, (m) => {
     const v = vault.get(m);
     if (typeof v === 'string') return v;
