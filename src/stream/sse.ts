@@ -1,5 +1,6 @@
 import { Transform, type TransformCallback } from 'node:stream';
 import { redactSync } from './redact.js';
+import { TOKEN_RE } from '../token.js';
 import type { Detector } from '../detectors/types.js';
 import type { Vault } from '../vault/types.js';
 
@@ -58,9 +59,8 @@ export function createSSERestoreStream(opts: { vault: Vault }): Transform {
 // `redactSync`. Tokens follow the same `<TYPE_<uuid>>` shape that the redact
 // path emits.
 function restoreSync(text: string, vault: Vault): string {
-  // Match the token pattern emitted by createRedactStream / redactSync.
-  // Type is a contiguous ASCII identifier; UUID body is hex with dashes.
-  const TOKEN_RE = /<([A-Z_][A-Z0-9_]*)_([0-9a-fA-F-]{8,})>/g;
+  // Match the canonical token shape (shared TOKEN_RE) emitted by
+  // createRedactStream / redactSync.
   return text.replace(TOKEN_RE, (matchStr) => {
     const original = vault.get(matchStr);
     if (typeof original === 'string') return original;

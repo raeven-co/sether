@@ -1,4 +1,4 @@
-import { findPhoneNumbersInText } from 'libphonenumber-js';
+import { findPhoneNumbersInText, type CountryCode } from 'libphonenumber-js';
 import type { Detector, DetectorMatch } from './types.js';
 
 // In-tree IPv6 validator — equivalent to Node's `net.isIPv6` for the
@@ -210,20 +210,45 @@ function ibanMod97(iban: string): boolean {
   return remainder === 1;
 }
 
-export const phoneDetector: Detector = {
-  type: 'PHONE',
-  detect(text) {
-    const matches: DetectorMatch[] = [];
-    for (const found of findPhoneNumbersInText(text)) {
-      matches.push({
-        start: found.startsAt,
-        end: found.endsAt,
-        value: text.slice(found.startsAt, found.endsAt),
-      });
-    }
-    return matches;
-  },
-};
+export interface PhoneDetectorOptions {
+  /**
+   * ISO 3166-1 alpha-2 country (e.g. 'US', 'NG', 'GB') used to parse
+   * NATIONAL-format numbers — ones written without a country code, like
+   * "(415) 555-2671" or "0803 123 4567". Without it, libphonenumber can only
+   * recognise numbers carrying an explicit country code ("+1 415 555 2671"),
+   * so national-format phones pass through unredacted.
+   */
+  defaultCountry?: CountryCode;
+}
+
+/**
+ * Build a PHONE detector. `createPhoneDetector()` with no options behaves
+ * exactly like the default `phoneDetector` export; pass `defaultCountry` when
+ * your traffic contains national-format numbers for a known region:
+ *
+ *   const detectors = [
+ *     ...basicDetectors.filter((d) => d.type !== 'PHONE'),
+ *     createPhoneDetector({ defaultCountry: 'US' }),
+ *   ];
+ */
+export function createPhoneDetector(opts: PhoneDetectorOptions = {}): Detector {
+  return {
+    type: 'PHONE',
+    detect(text) {
+      const matches: DetectorMatch[] = [];
+      for (const found of findPhoneNumbersInText(text, opts.defaultCountry)) {
+        matches.push({
+          start: found.startsAt,
+          end: found.endsAt,
+          value: text.slice(found.startsAt, found.endsAt),
+        });
+      }
+      return matches;
+    },
+  };
+}
+
+export const phoneDetector: Detector = createPhoneDetector();
 
 function matchAll(text: string, re: RegExp): DetectorMatch[] {
   const matches: DetectorMatch[] = [];

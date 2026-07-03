@@ -23,7 +23,9 @@ export {
   ipv6Detector,
   ibanDetector,
   phoneDetector,
+  createPhoneDetector,
 } from './detectors/basic.js';
+export type { PhoneDetectorOptions } from './detectors/basic.js';
 
 // Detectors — secrets pack
 export {

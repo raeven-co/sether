@@ -1,5 +1,68 @@
 # Changelog
 
+## 0.5.7 — 2026-06-24
+
+Detection-coverage and hygiene patch. **No breaking changes** — the default
+`phoneDetector`, every other export, and all emitted tokens behave exactly as
+in 0.5.6.
+
+### Added — `createPhoneDetector({ defaultCountry })`
+
+Closes a silent detection gap: libphonenumber can only recognise phone numbers
+carrying an explicit country code, so national-format numbers — `(415) 555-2671`,
+`0803 123 4567` — passed through **unredacted** (verified empirically). The new
+factory lets you opt into a region hint:
+
+```ts
+const sether = new Sether({
+  detectors: [
+    ...basicDetectors.filter((d) => d.type !== 'PHONE'),
+    createPhoneDetector({ defaultCountry: 'US' }), // or 'NG', 'GB', …
+  ],
+});
+```
+
+`createPhoneDetector()` with no options is exactly the default `phoneDetector`
+(which is now defined as `createPhoneDetector()`), so existing behaviour is
+untouched. Exported from both the root and `/browser` entries, with the gap and
+the opt-in documented under *Honest limitations*.
+
+### Changed — one canonical token pattern (`src/token.ts`)
+
+The `<TYPE_uuid>` token regex was duplicated across five modules and had
+already drifted: the streaming restore required the detector type to start with
+a letter, while the SSE / Express / OpenAI / Anthropic restore paths also
+accepted a leading underscore. All five now share a single `TOKEN_RE`
+standardised on the broader grammar — for custom detector types beginning with
+`_`, the streaming restore now restores them like every other path (strictly
+more restoration, never less). No change for any built-in detector type.
+
+### Changed — dependency refresh (within existing semver ranges)
+
+- `libphonenumber-js` 1.12.42 → **1.13.8** (runtime; newer phone metadata —
+  this is what fresh installs already resolve, so the lockfile now tests what
+  consumers actually get)
+- Dev tooling: `eslint` 10.6.0, `prettier` 3.9.4, `typescript-eslint` 8.62.1,
+  `vitest` 4.1.9 — all within-range patch/minor updates
+- The known **low-severity, dev-only** `esbuild` advisory (dev-server file read
+  on Windows; Sether never runs esbuild's dev server) remains deferred — the
+  patched esbuild 0.28.1 is still outside the range latest `tsup` accepts.
+
+### Documentation & CI
+
+- README: cross-linked the Python port (`pip install sether`, PyPI + docs —
+  both verified live), documented the national-format phone limitation, and
+  added `maxTokenLength` guidance (must exceed the longest token, ~45-60 chars,
+  or a boundary-split token can flush unrestorable).
+- CI: test matrix extended to Node 18 / 20 / 22 / **24**.
+
+### Build & test surface
+
+- Tests: **147 passing** (143 prior + 4 for `createPhoneDetector`)
+- ReDoS scan: 0 unsafe; bundles ASCII-only; lint/typecheck clean
+- Runtime dependencies: **1** (`libphonenumber-js`) — unchanged
+- Consumer-facing `npm audit --omit=dev`: **0 vulnerabilities**
+
 ## 0.5.6 — 2026-06-24
 
 Additive convenience release. **No breaking changes** — every existing export and

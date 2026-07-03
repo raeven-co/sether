@@ -20,7 +20,7 @@ Groq, Ollama**, your own fine-tunes — anything that speaks HTTP and
 streams text. Sether doesn't care who's on the other end; it operates on
 the text stream.
 
-**Status:** `0.5.6` — browser-safe `@raeven-co/sether/browser` entry, opt-in identity pack with multilingual labels (names, DOB, passport, address), secrets pack, SSE/JSON-stream mode, audit events, and drop-in middlewares for Express / fetch / OpenAI / Anthropic.
+**Status:** `0.5.7` — browser-safe `@raeven-co/sether/browser` entry, opt-in identity pack with multilingual labels (names, DOB, passport, address), secrets pack, SSE/JSON-stream mode, audit events, and drop-in middlewares for Express / fetch / OpenAI / Anthropic.
 A product of **[Raeven Company LTD](https://admin.raevenmarket.com.ng)**
 
 ---
@@ -61,6 +61,11 @@ npm install @raeven-co/sether
 ```
 
 Requires Node 18+. ESM and CommonJS both supported.
+
+**Using Python?** The same engine ships as the [`sether`](https://pypi.org/project/sether/)
+package on PyPI (`pip install sether`), with sync + async streaming and
+httpx / ASGI / WSGI / OpenAI / Anthropic integrations. Docs:
+<https://setherai.vercel.app/docs/python>.
 
 ---
 
@@ -137,12 +142,34 @@ const sether = new Sether({
 | Detector | Method | Notes |
 | --- | --- | --- |
 | `emailDetector` (`EMAIL`) | Regex (`\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b`) | RFC 5321-style local part. ASCII-only — IDN/Unicode addresses are not matched. |
-| `phoneDetector` (`PHONE`) | [libphonenumber-js](https://github.com/catamphetamine/libphonenumber-js) | International phone parsing. |
+| `phoneDetector` (`PHONE`) | [libphonenumber-js](https://github.com/catamphetamine/libphonenumber-js) | Matches numbers written with a country code (`+1 415 555 2671`). For NATIONAL-format numbers (`(415) 555-2671`, `0803 123 4567`) use `createPhoneDetector({ defaultCountry: 'US' })` — see below. |
 | `creditCardDetector` (`CC`) | Bounded regex + Luhn check | 13–19 digit numbers passing Luhn. ReDoS-safe. |
 | `ssnDetector` (`SSN`) | Regex + SSA invalid-prefix blacklist | Rejects area `000`, `666`, and `9XX` (ITIN range), group `00`, serial `0000`. |
 | `ipv4Detector` (`IPV4`) | Strict octet-bounded regex | `0–255` per octet, no leading zeros. |
 | `ipv6Detector` (`IPV6`) | Candidate regex + in-tree `isIPv6` validator (equivalent to Node's `net.isIPv6`, no `node:net` import) | **Known limit:** `::1` and IPv4-in-IPv6 (`::ffff:192.0.2.1`) not matched. |
 | `ibanDetector` (`IBAN`) | Regex + mod-97 checksum | Validates against ISO 13616. |
+
+#### National-format phone numbers (`createPhoneDetector`)
+
+Without a country hint, libphonenumber can only recognise numbers that carry
+an explicit country code — so `+1 415 555 2671` is redacted but `(415) 555-2671`
+is not. If your traffic contains national-format numbers for a known region,
+swap the default PHONE detector for one built with `createPhoneDetector`
+(new in 0.5.7):
+
+```ts
+import { Sether, basicDetectors, createPhoneDetector } from '@raeven-co/sether';
+
+const sether = new Sether({
+  detectors: [
+    ...basicDetectors.filter((d) => d.type !== 'PHONE'),
+    createPhoneDetector({ defaultCountry: 'US' }), // or 'NG', 'GB', …
+  ],
+});
+```
+
+`createPhoneDetector()` with no options is exactly the default `phoneDetector`,
+so nothing changes unless you opt in.
 
 ### Identity pack (opt-in — new in 0.3.0)
 
@@ -293,7 +320,7 @@ const sether = new Sether({ safeDistanceBytes: 4096 }); // e.g. for large JWTs
 - **ReDoS-safe:** all regex literals scanned by `safe-regex2` in CI (161 patterns, 0 unsafe)
 - **TypeScript strict mode:** no `any`, no implicit types
 - **Dual build:** ESM + CJS, ≈ 36 KB each
-- **CI matrix:** Node 18 / 20 / 22 — lint, typecheck, format, regex-safety, 143 tests, build
+- **CI matrix:** Node 18 / 20 / 22 / 24 — lint, typecheck, format, regex-safety, 147 tests, build
 - **MIT licensed** — fork it, audit it, no vendor lock-in
 
 ---
@@ -303,6 +330,7 @@ const sether = new Sether({ safeDistanceBytes: 4096 }); // e.g. for large JWTs
 Known limitations in this release:
 
 - **Email detection is ASCII-only.** IDN/Unicode local parts won't match. Unicode-aware email is on the roadmap.
+- **Phone numbers without a country code are not detected by default.** `+1 415 555 2671` is caught; `(415) 555-2671` alone is not — libphonenumber needs a region to parse national formats. Opt in with `createPhoneDetector({ defaultCountry: 'US' })` (see [Built-in detectors](#built-in-detectors-basic-pack)).
 - **IPv6 `::1` (loopback) is not detected.** Candidate regex requires 4+ chars. Loopback isn't customer PII, but flag it in your audit logs if it matters for your threat model.
 - **Credit-card regex is permissive.** Anything 13–23 chars of digits/spaces/dashes is a candidate, then validated by Luhn. False positives in dense numeric content are possible.
 - **Names / DOB / passport / address are label-anchored, not free-text NER.** The opt-in identity pack (0.3.0) catches these when they appear with a label or distinctive structure. Unlabelled names / organisations / locations in running prose need the ONNX NER model shipping separately as `@raeven-co/sether-ner`.
@@ -475,4 +503,5 @@ Email `emorylebo@gmail.com`.
 - **Live sandbox:** <https://setherai.vercel.app/#sandbox>
 - **GitHub:** <https://github.com/raeven-co/sether>
 - **npm:** <https://www.npmjs.com/package/@raeven-co/sether>
+- **PyPI (Python port):** <https://pypi.org/project/sether/> · [docs](https://setherai.vercel.app/docs/python)
 - **Issues:** <https://github.com/raeven-co/sether/issues>

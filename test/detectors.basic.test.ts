@@ -7,6 +7,7 @@ import {
   ipv6Detector,
   ibanDetector,
   phoneDetector,
+  createPhoneDetector,
 } from '../src/detectors/basic.js';
 
 describe('emailDetector', () => {
@@ -184,5 +185,42 @@ describe('phoneDetector', () => {
   it('does not match arbitrary digit sequences', () => {
     const m = phoneDetector.detect('order id 123456 ref 7890');
     expect(m).toHaveLength(0);
+  });
+});
+
+describe('createPhoneDetector', () => {
+  it('with no options behaves exactly like the default phoneDetector', () => {
+    const texts = [
+      'Call me at +1 (415) 555-2671 anytime',
+      'call 415-555-2671 now', // national format — not matched without a country
+      'order id 123456 ref 7890',
+    ];
+    const custom = createPhoneDetector();
+    for (const t of texts) {
+      expect(custom.detect(t)).toEqual(phoneDetector.detect(t));
+    }
+  });
+
+  it('detects national-format numbers when defaultCountry is set', () => {
+    const us = createPhoneDetector({ defaultCountry: 'US' });
+    expect(us.detect('call 415-555-2671 now').length).toBeGreaterThanOrEqual(1);
+    expect(us.detect('call (415) 555-2671 now').length).toBeGreaterThanOrEqual(1);
+
+    const ng = createPhoneDetector({ defaultCountry: 'NG' });
+    expect(ng.detect('call 0803 123 4567 now').length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('still matches international numbers regardless of defaultCountry', () => {
+    const us = createPhoneDetector({ defaultCountry: 'US' });
+    expect(us.detect('UK office: +44 20 7946 0958').length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('reports correct offsets for a national-format match', () => {
+    const us = createPhoneDetector({ defaultCountry: 'US' });
+    const text = 'call 415-555-2671 now';
+    const [m] = us.detect(text);
+    if (!m) throw new Error('expected a match');
+    expect(text.slice(m.start, m.end)).toBe(m.value);
+    expect(m.value).toContain('415');
   });
 });

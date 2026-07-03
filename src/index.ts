@@ -13,6 +13,7 @@ import {
   ipv6Detector,
   ibanDetector,
   phoneDetector,
+  createPhoneDetector,
 } from './detectors/basic.js';
 
 export interface SetherOptions {
@@ -74,7 +75,9 @@ export {
   ipv6Detector,
   ibanDetector,
   phoneDetector,
+  createPhoneDetector,
 };
+export type { PhoneDetectorOptions } from './detectors/basic.js';
 
 // Detectors — secrets pack (new in 0.2.0)
 export {

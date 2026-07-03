@@ -1,6 +1,6 @@
 {
   "name": "@raeven-co/sether",
-  "version": "0.5.6",
+  "version": "0.5.7",
   "description": "Streaming PII redaction for AI applications. The hiding place for sensitive data flowing into LLMs. Secrets pack, SSE-aware streaming, audit events, drop-in middlewares for Express / fetch / OpenAI / Anthropic.",
   "type": "module",
   "sideEffects": false,
