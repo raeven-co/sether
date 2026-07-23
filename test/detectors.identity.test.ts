@@ -186,3 +186,47 @@ describe('addressDetector', () => {
     expect(addressDetector.detect('Address: see above')).toHaveLength(0);
   });
 });
+
+describe('identity pack — JSON / structured-data keys (0.6.0)', () => {
+  it('NAME: catches "customer_name": "…"', () => {
+    const m = nameDetector.detect('{ "customer_name": "Amara Okafor" }');
+    expect(m).toHaveLength(1);
+    expect(m[0]?.value).toBe('Amara Okafor');
+  });
+
+  it('NAME: catches snake, camel, and spaced keys', () => {
+    expect(nameDetector.detect('"full_name": "John Smith"')[0]?.value).toBe('John Smith');
+    expect(nameDetector.detect('"firstName": "Marie Curie"')[0]?.value).toBe('Marie Curie');
+    expect(nameDetector.detect('"patient name": "Ada Lovelace"')[0]?.value).toBe('Ada Lovelace');
+  });
+
+  it('NAME: does NOT over-fire on filename / lowercase username values', () => {
+    expect(nameDetector.detect('"filename": "report.pdf"')).toHaveLength(0);
+    expect(nameDetector.detect('"username": "amara_dev"')).toHaveLength(0);
+  });
+
+  it('DOB: catches "date_of_birth" and "dob" keys, validates the date', () => {
+    expect(dobDetector.detect('"date_of_birth": "1990-05-12"')[0]?.value).toBe('1990-05-12');
+    expect(dobDetector.detect('"dob": "1985-01-30"')[0]?.value).toBe('1985-01-30');
+    // implausible / non-date values are rejected
+    expect(dobDetector.detect('"birth_place": "Lagos"')).toHaveLength(0);
+    expect(dobDetector.detect('"date_of_birth": "2099-01-01"')).toHaveLength(0);
+  });
+
+  it('PASSPORT: catches "passport_number": "…"', () => {
+    expect(passportDetector.detect('"passport_number": "A1234567"')[0]?.value).toBe('A1234567');
+    expect(passportDetector.detect('"passport": "VALIDONLY"')).toHaveLength(0); // no digit
+  });
+
+  it('ADDRESS: catches "billing_address": "…" and lifts it cleanly (no trailing quote)', () => {
+    const m = addressDetector.detect('"billing_address": "12 Marina Road, Lagos",');
+    expect(m.some((x) => x.value === '12 Marina Road, Lagos')).toBe(true);
+    // the captured value must not include the JSON closing quote
+    expect(m.every((x) => !x.value.includes('"'))).toBe(true);
+  });
+
+  it('does NOT fire on natural-language prose (requires the "key": shape)', () => {
+    expect(nameDetector.detect('the name is unknown right now')).toHaveLength(0);
+    expect(dobDetector.detect('the birth of a nation was in 1915 somewhere')).toHaveLength(0);
+  });
+});

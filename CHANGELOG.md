@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.6.0 — 2026-07-16
+
+Additive. Opt-in `identityDetectors` only; `basicDetectors` and default
+`new Sether()` are byte-for-byte unchanged. Prompted by a real integration — a
+document-template API tokenising JSON payloads before an AI step, then restoring
+the originals for document generation.
+
+### Added — the identity pack now anchors on JSON / structured-data keys
+
+`nameDetector`, `dobDetector`, `passportDetector`, and `addressDetector`
+previously required a natural-language label (`Name:`, `DOB:`). They now also
+fire on a JSON-style key whose name contains the class word, e.g.
+`"customer_name": "…"`, `"date_of_birth": "…"`, `"passport_number": "…"`,
+`"billing_address": "…"` (snake_case / kebab-case / camelCase / spaced).
+
+The existing value validators — uppercase-first names + common-word denylist,
+calendar-plausible dates, digit-bearing passports — reject non-PII values, so a
+loose key match cannot over-fire (`"filename"`, `"username": "amara_dev"` stay
+clean). The new patterns require the `"key":` shape, so natural-language prose is
+unaffected. The address value capture now stops at a `"` so a JSON string value
+lifts cleanly, keeping the redacted payload **valid JSON**.
+
+### Build & test surface
+
+- Tests: **154 passing** (147 prior + 7 for JSON-key detection & FP guards)
+- ReDoS scan: 0 unsafe; bundles ASCII-only; lint/typecheck clean
+- Runtime dependencies: 1 (`libphonenumber-js`) — unchanged
+
 ## 0.5.7 — 2026-06-24
 
 Detection-coverage and hygiene patch. **No breaking changes** — the default

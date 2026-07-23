@@ -80,7 +80,14 @@ const NAME_LABEL_RE =
 const NAME_LABEL_INTL_RE =
   /(?:\u540D\u524D|\u6C0F\u540D|\u59D3\u540D|\uC774\uB984|\uC131\uBA85|\u0438\u043C\u044F|\u0627\u0644\u0627\u0633\u0645)\s*[:\uFF1A]\s*/gi;
 
-const NAME_LABELS = [NAME_LABEL_RE, NAME_LABEL_INTL_RE] as const;
+// JSON / structured-data key, e.g. `"customer_name": "Amara Okafor"`. The key
+// contains the label word (snake_case, kebab-case, camelCase, or spaced); the
+// value validator (uppercase-first + common-word denylist) rejects non-names, so
+// a loose key match is safe. Requires the `"key":` shape, so it never fires on
+// natural-language prose. New in 0.6.0.
+const NAME_KEY_RE = /"[A-Za-z0-9_ -]{0,40}name[A-Za-z0-9_ -]{0,20}"\s*:\s*"?/gi;
+
+const NAME_LABELS = [NAME_LABEL_RE, NAME_LABEL_INTL_RE, NAME_KEY_RE] as const;
 
 // Words that follow a name label but are clearly not a person. If EVERY
 // captured word is in this set ("The Customer", "Dear Sir", "Service Team"),
@@ -211,7 +218,11 @@ const DOB_LABEL_RE =
 const DOB_LABEL_INTL_RE =
   /(?:\u751F\u5E74\u6708\u65E5|\u51FA\u751F\u65E5\u671F|\u51FA\u751F\u65E5|\uC0DD\uB144\uC6D4\uC77C|\u0434\u0430\u0442\u0430\s+\u0440\u043E\u0436\u0434\u0435\u043D\u0438\u044F)\s*[:\uFF1A]\s*/gi;
 
-const DOB_LABELS = [DOB_LABEL_RE, DOB_LABEL_INTL_RE] as const;
+// JSON key, e.g. `"date_of_birth": "1990-05-12"` / `"dob": "…"`. Calendar +
+// plausibility validation on the value keeps false positives out. New in 0.6.0.
+const DOB_KEY_RE = /"[A-Za-z0-9_ -]{0,40}(?:dob|birth)[A-Za-z0-9_ -]{0,20}"\s*:\s*"?/gi;
+
+const DOB_LABELS = [DOB_LABEL_RE, DOB_LABEL_INTL_RE, DOB_KEY_RE] as const;
 
 const MONTHS =
   'jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?';
@@ -312,7 +323,12 @@ const PASSPORT_LABEL_RE =
 const PASSPORT_LABEL_INTL_RE =
   /(?:\u30D1\u30B9\u30DD\u30FC\u30C8|\u62A4\u7167|\uC5EC\uAD8C|\u043F\u0430\u0441\u043F\u043E\u0440\u0442)\s*[:\uFF1A#]?\s*/gi;
 
-const PASSPORT_LABELS = [PASSPORT_LABEL_RE, PASSPORT_LABEL_INTL_RE] as const;
+// JSON key, e.g. `"passport_number": "A1234567"`. The value must be 6-9
+// alphanumerics containing a digit, so a loose key match cannot over-fire on an
+// arbitrary string. New in 0.6.0.
+const PASSPORT_KEY_RE = /"[A-Za-z0-9_ -]{0,40}passport[A-Za-z0-9_ -]{0,20}"\s*:\s*"?/gi;
+
+const PASSPORT_LABELS = [PASSPORT_LABEL_RE, PASSPORT_LABEL_INTL_RE, PASSPORT_KEY_RE] as const;
 
 const PASSPORT_VALUE_RE = /^[A-Za-z0-9]{6,9}\b/;
 
@@ -344,7 +360,12 @@ const ADDRESS_LABEL_RE =
 const ADDRESS_LABEL_INTL_RE =
   /(?:\u4F4F\u6240|\u5730\u5740|\uC8FC\uC18C|\u0430\u0434\u0440\u0435\u0441|direcci\u00F3n|endere\u00E7o)\s*[:\uFF1A]\s*/gi;
 
-const ADDRESS_LABELS = [ADDRESS_LABEL_RE, ADDRESS_LABEL_INTL_RE] as const;
+// JSON key, e.g. `"billing_address": "12 Marina Road, Lagos"`. The value capture
+// below stops at a double-quote, so it lifts the JSON string value cleanly. New
+// in 0.5.7.
+const ADDRESS_KEY_RE = /"[A-Za-z0-9_ -]{0,40}addr[A-Za-z0-9_ -]{0,20}"\s*:\s*"?/gi;
+
+const ADDRESS_LABELS = [ADDRESS_LABEL_RE, ADDRESS_LABEL_INTL_RE, ADDRESS_KEY_RE] as const;
 
 const STREET_SUFFIX_RE =
   /\b(?:street|st|avenue|ave|road|rd|boulevard|blvd|lane|ln|drive|dr|court|ct|way|place|pl|terrace|ter|square|sq|highway|hwy|parkway|pkwy)\b\.?/gi;
@@ -364,7 +385,15 @@ export const addressDetector: Detector = {
       let start = vs;
       while (start < text.length && /[ \t]/.test(text[start] as string)) start++;
       let end = start;
-      while (end < text.length && text[end] !== '\n' && end - start < MAX_ADDRESS_LEN) end++;
+      // Stop at end-of-line OR a double-quote (the JSON string delimiter), so a
+      // labelled value lifts cleanly from both prose and `"address": "…"`.
+      while (
+        end < text.length &&
+        text[end] !== '\n' &&
+        text[end] !== '"' &&
+        end - start < MAX_ADDRESS_LEN
+      )
+        end++;
       const value = text.slice(start, end).replace(/\s+$/, '');
       // Keep false positives down: an address line has a digit or a comma.
       if (value.length >= 5 && /[\d,]/.test(value)) {
