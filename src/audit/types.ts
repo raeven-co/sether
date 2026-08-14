@@ -97,4 +97,12 @@ export const DEFAULT_REGULATION_MAPPINGS: Readonly<
   ],
   JWT: [{ framework: 'SOC2', reference: 'CC6.1' }],
   HIGH_ENTROPY: [{ framework: 'SOC2', reference: 'CC6.1' }],
+  API_KEY: [
+    { framework: 'SOC2', reference: 'CC6.1' },
+    { framework: 'ISO_27001', reference: 'A.9.4.3' },
+  ],
+  PASSWORD: [
+    { framework: 'SOC2', reference: 'CC6.1' },
+    { framework: 'ISO_27001', reference: 'A.9.4.3' },
+  ],
 };

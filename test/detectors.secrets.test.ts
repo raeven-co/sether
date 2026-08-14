@@ -237,8 +237,11 @@ describe('highEntropyDetector', () => {
 });
 
 describe('secretsDetectors aggregate', () => {
-  it('exports all 8 detectors', () => {
-    expect(secretsDetectors).toHaveLength(8);
+  it('exports all 10 detectors', () => {
+    expect(secretsDetectors).toHaveLength(10);
+    const types = secretsDetectors.map((d) => d.type);
+    expect(types).toContain('API_KEY');
+    expect(types).toContain('PASSWORD');
   });
 
   it('detects multiple secret types in a single document', () => {

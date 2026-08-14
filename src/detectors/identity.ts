@@ -213,7 +213,7 @@ export const nameDetector: Detector = {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const DOB_LABEL_RE =
-  /\b(?:date\s+of\s+birth|date\s+de\s+naissance|fecha\s+de\s+nacimiento|data\s+de\s+nascimento|geburtsdatum|geboortedatum|d\.?o\.?b\.?|birth\s?date|born)\b[\s:=-]{0,3}/gi;
+  /\b(?:date\s+of\s+birth|date\s+de\s+naissance|fecha\s+de\s+nacimiento|data\s+de\s+nascimento|geburtsdatum|geboortedatum|d\.?o\.?b\.?|birth\s?date|born(?: on)?)\b[\s:=-]{0,3}/gi;
 
 const DOB_LABEL_INTL_RE =
   /(?:\u751F\u5E74\u6708\u65E5|\u51FA\u751F\u65E5\u671F|\u51FA\u751F\u65E5|\uC0DD\uB144\uC6D4\uC77C|\u0434\u0430\u0442\u0430\s+\u0440\u043E\u0436\u0434\u0435\u043D\u0438\u044F)\s*[:\uFF1A]\s*/gi;
@@ -365,23 +365,42 @@ const ADDRESS_LABEL_INTL_RE =
 // in 0.5.7.
 const ADDRESS_KEY_RE = /"[A-Za-z0-9_ -]{0,40}addr[A-Za-z0-9_ -]{0,20}"\s*:\s*"?/gi;
 
-const ADDRESS_LABELS = [ADDRESS_LABEL_RE, ADDRESS_LABEL_INTL_RE, ADDRESS_KEY_RE] as const;
+// Conversational anchors, e.g. "I live at 24 Adetokunbo Ademola Crescent".
+// These introduce an address in running prose the way "Address:" does in a
+// form, so the same capture-to-end-of-line + digit/comma validation applies.
+// New in 0.7.0.
+const ADDRESS_PROSE_RE =
+  /\b(?:liv(?:e|es|ing)\s+at|located\s+at|resid(?:e|es|ing)\s+at|based\s+at|deliver(?:y)?\s+to|ship(?:ped|ping)?\s+to|stay(?:s|ing)?\s+at)\b\s*/gi;
 
+// crescent/cres, gardens/gdns, grove, mews, estate: common UK/Commonwealth
+// (incl. Nigerian) street suffixes — added in 0.7.0. Verb-shaped suffixes
+// ("close", "walk", "rise") are deliberately excluded from standalone
+// detection ("the 3 stores close at 5pm" must not match); the prose/label
+// anchors above still catch those addresses.
 const STREET_SUFFIX_RE =
-  /\b(?:street|st|avenue|ave|road|rd|boulevard|blvd|lane|ln|drive|dr|court|ct|way|place|pl|terrace|ter|square|sq|highway|hwy|parkway|pkwy)\b\.?/gi;
+  /\b(?:street|st|avenue|ave|road|rd|boulevard|blvd|lane|ln|drive|dr|court|ct|way|place|pl|terrace|ter|square|sq|highway|hwy|parkway|pkwy|crescent|cres|gardens|gdns|grove|mews|estate)\b\.?/gi;
 
 // A street line ending at the suffix: house number + up to ~40 chars of words.
 const STREET_HEAD_RE = /\d{1,6}\s+[A-Za-z0-9.' -]{0,40}$/;
 
 const UK_POSTCODE_RE = /\b[A-Za-z]{1,2}\d[A-Za-z\d]?\s*\d[A-Za-z]{2}\b/g;
 
+// The bare word "address" also appears in NON-POSTAL compounds — "email
+// address", "IP address", "wallet address" — where the line's other content
+// (digits, commas) would otherwise pass the address-line validation and
+// swallow everything to end-of-line as one giant false match. Reject the
+// label when it is immediately preceded by one of these qualifiers.
+// Fixed in 0.7.0 (field report: "my email address is x@y.com, call me on
+// 0806…" was detected as one ADDRESS spanning the email AND the phone).
+const NON_POSTAL_QUALIFIER_RE =
+  /(?:e-?mail|ip|i\.p\.|mac|wallet|btc|eth|crypto|contract|server|host|url|web|memory)[ \t_-]{0,3}$/i;
+
 export const addressDetector: Detector = {
   type: 'ADDRESS',
   detect(text) {
     const matches: DetectorMatch[] = [];
 
-    // (a) Labelled address line — capture to end of line, bounded.
-    eachLabelMatch(text, ADDRESS_LABELS, (vs) => {
+    const captureLabelledLine = (vs: number): void => {
       let start = vs;
       while (start < text.length && /[ \t]/.test(text[start] as string)) start++;
       let end = start;
@@ -399,7 +418,25 @@ export const addressDetector: Detector = {
       if (value.length >= 5 && /[\d,]/.test(value)) {
         matches.push({ start, end: start + value.length, value });
       }
-    });
+    };
+
+    // (a) Labelled address line — capture to end of line, bounded. The main
+    // Latin label runs in its own loop so the qualifier check above can see
+    // what precedes the label.
+    ADDRESS_LABEL_RE.lastIndex = 0;
+    let lm: RegExpExecArray | null;
+    while ((lm = ADDRESS_LABEL_RE.exec(text)) !== null) {
+      const before = text.slice(Math.max(0, lm.index - 16), lm.index);
+      if (!NON_POSTAL_QUALIFIER_RE.test(before)) {
+        captureLabelledLine(lm.index + lm[0].length);
+      }
+      if (lm.index === ADDRESS_LABEL_RE.lastIndex) ADDRESS_LABEL_RE.lastIndex++;
+    }
+    eachLabelMatch(
+      text,
+      [ADDRESS_LABEL_INTL_RE, ADDRESS_KEY_RE, ADDRESS_PROSE_RE],
+      captureLabelledLine,
+    );
 
     // (b) Standalone street line: street suffix preceded by a house number.
     STREET_SUFFIX_RE.lastIndex = 0;

@@ -24,6 +24,7 @@ export {
   ibanDetector,
   phoneDetector,
   createPhoneDetector,
+  createMultiRegionPhoneDetector,
 } from './detectors/basic.js';
 export type { PhoneDetectorOptions } from './detectors/basic.js';
 
@@ -38,7 +39,13 @@ export {
   stripeKeyDetector,
   jwtDetector,
   highEntropyDetector,
+  labeledApiKeyDetector,
+  labeledPasswordDetector,
 } from './detectors/secrets.js';
+
+// Alias engine (new in 0.7.0) — realistic decoys + reversible vault
+export { aliasValue, suggestAliases, shapeAlias, AliasVault } from './alias.js';
+export type { AliasOptions, AliasEntry } from './alias.js';
 
 // Detectors — identity pack (label-anchored name / DOB / passport / address)
 export {

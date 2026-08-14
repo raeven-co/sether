@@ -250,6 +250,47 @@ export function createPhoneDetector(opts: PhoneDetectorOptions = {}): Detector {
 
 export const phoneDetector: Detector = createPhoneDetector();
 
+/**
+ * Build a PHONE detector that recognises national-format numbers for SEVERAL
+ * regions at once. Each region gets its own libphonenumber pass; matches are
+ * merged and de-duplicated by span (international `+…` numbers are found by
+ * every pass, so the undefined-country pass runs first and wins).
+ *
+ * Use this when your traffic mixes regions — e.g. a browser extension whose
+ * user may paste a US "(415) 555-2671" and a Nigerian "0803 123 4567" in the
+ * same prompt:
+ *
+ *   createMultiRegionPhoneDetector(['US', 'GB', 'NG'])
+ *
+ * Overlapping (non-identical) spans from different regions are all returned;
+ * downstream overlap resolution (redact pipeline / caller) picks the winner.
+ */
+export function createMultiRegionPhoneDetector(countries: readonly CountryCode[]): Detector {
+  // De-dupe the country list defensively — duplicate passes are pure waste.
+  const regions = [...new Set(countries)];
+  return {
+    type: 'PHONE',
+    detect(text) {
+      const seen = new Set<string>();
+      const matches: DetectorMatch[] = [];
+      const passes: (CountryCode | undefined)[] = [undefined, ...regions];
+      for (const country of passes) {
+        for (const found of findPhoneNumbersInText(text, country)) {
+          const key = `${found.startsAt}:${found.endsAt}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          matches.push({
+            start: found.startsAt,
+            end: found.endsAt,
+            value: text.slice(found.startsAt, found.endsAt),
+          });
+        }
+      }
+      return matches.sort((a, b) => a.start - b.start || b.end - a.end);
+    },
+  };
+}
+
 function matchAll(text: string, re: RegExp): DetectorMatch[] {
   const matches: DetectorMatch[] = [];
   re.lastIndex = 0;

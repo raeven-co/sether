@@ -183,6 +183,69 @@ export const highEntropyDetector: Detector = {
   },
 };
 
+// Label-anchored API key — catches keys with NO published prefix and below the
+// high-entropy length floor, the way users actually paste them into prompts:
+//   "my api key is AbC123xYz789QwE456"
+//   "access_token: 9f8e7d6c5b4a3928"
+//   "client secret = qT4xP0mN8kL2jH6g"
+// The label does the heavy lifting; the value validator (12+ chars, must mix
+// letters and digits) keeps prose like "api key management" from matching.
+// New in 0.7.0.
+const LABELED_KEY_RE =
+  /\b(?:api|access|secret|client|auth|app|service|encryption|signing|refresh|bearer)[ _-]?(?:key|token|secret)s?\b\s*(?:is|was|[:=])?\s*["'`]?([A-Za-z0-9][A-Za-z0-9._-]{10,127})/gi;
+
+export const labeledApiKeyDetector: Detector = {
+  type: 'API_KEY',
+  detect(text) {
+    const matches: DetectorMatch[] = [];
+    LABELED_KEY_RE.lastIndex = 0;
+    let m: RegExpExecArray | null;
+    while ((m = LABELED_KEY_RE.exec(text)) !== null) {
+      const value = m[1] as string;
+      // Key-shaped only: needs at least one letter AND one digit.
+      if (!/[A-Za-z]/.test(value) || !/\d/.test(value)) continue;
+      const start = m.index + m[0].length - value.length;
+      matches.push({ start, end: start + value.length, value });
+    }
+    return matches;
+  },
+};
+
+// Label-anchored password — "my password is hunter2butlonger", "password: X".
+// The separator (is/was/:/=) is MANDATORY: bare "password hunter2" is too
+// ambiguous in prose. A denylist rejects the common non-secret continuations
+// ("password is required", "password is wrong"). New in 0.7.0.
+const LABELED_PASSWORD_RE =
+  /\b(?:password|passwd|passphrase|pwd)\b\s*(?:is|was|[:=])\s*["'`]?([^\s"'`]{4,64})/gi;
+
+const PASSWORD_NON_SECRETS = new Set([
+  'required', 'needed', 'wrong', 'incorrect', 'invalid', 'missing', 'expired',
+  'reset', 'secure', 'insecure', 'weak', 'strong', 'correct', 'empty', 'blank',
+  'optional', 'protected', 'disabled', 'enabled', 'hidden', 'visible', 'stored',
+  'hashed', 'encrypted', 'plaintext', 'leaked', 'compromised', 'changed',
+  'forgotten', 'unknown', 'gone', 'safe', 'saved', 'set', 'unset', 'case',
+  'the', 'a', 'an', 'my', 'your', 'our', 'their', 'not', 'now', 'still', 'too',
+  'also', 'always', 'never', 'sometimes', 'already', 'again', 'fine', 'okay',
+]);
+
+export const labeledPasswordDetector: Detector = {
+  type: 'PASSWORD',
+  detect(text) {
+    const matches: DetectorMatch[] = [];
+    LABELED_PASSWORD_RE.lastIndex = 0;
+    let m: RegExpExecArray | null;
+    while ((m = LABELED_PASSWORD_RE.exec(text)) !== null) {
+      // Strip trailing sentence punctuation the character class swallowed.
+      const value = (m[1] as string).replace(/[.,;:!?)\]}]+$/, '');
+      if (value.length < 4) continue;
+      if (PASSWORD_NON_SECRETS.has(value.toLowerCase())) continue;
+      const start = m.index + m[0].length - (m[1] as string).length;
+      matches.push({ start, end: start + value.length, value });
+    }
+    return matches;
+  },
+};
+
 // Convenience export — all secrets detectors in one array.
 export const secretsDetectors: readonly Detector[] = [
   awsAccessKeyDetector,
@@ -193,4 +256,6 @@ export const secretsDetectors: readonly Detector[] = [
   stripeKeyDetector,
   jwtDetector,
   highEntropyDetector,
+  labeledApiKeyDetector,
+  labeledPasswordDetector,
 ];

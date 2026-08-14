@@ -14,6 +14,7 @@ import {
   ibanDetector,
   phoneDetector,
   createPhoneDetector,
+  createMultiRegionPhoneDetector,
 } from './detectors/basic.js';
 
 export interface SetherOptions {
@@ -76,6 +77,7 @@ export {
   ibanDetector,
   phoneDetector,
   createPhoneDetector,
+  createMultiRegionPhoneDetector,
 };
 export type { PhoneDetectorOptions } from './detectors/basic.js';
 
@@ -90,7 +92,13 @@ export {
   stripeKeyDetector,
   jwtDetector,
   highEntropyDetector,
+  labeledApiKeyDetector,
+  labeledPasswordDetector,
 } from './detectors/secrets.js';
+
+// Alias engine (new in 0.7.0) — realistic decoys + reversible vault
+export { aliasValue, suggestAliases, shapeAlias, AliasVault } from './alias.js';
+export type { AliasOptions, AliasEntry } from './alias.js';
 
 // Detectors — identity pack (new in 0.3.0; opt-in, NOT in basicDetectors)
 export {
