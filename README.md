@@ -171,6 +171,17 @@ const sether = new Sether({
 `createPhoneDetector()` with no options is exactly the default `phoneDetector`,
 so nothing changes unless you opt in.
 
+When your traffic mixes regions (a browser extension, a global chat product),
+use `createMultiRegionPhoneDetector` (new in 0.7.0) — one PHONE detector that
+runs a libphonenumber pass per region and de-duplicates by span:
+
+```ts
+import { createMultiRegionPhoneDetector } from '@raeven-co/sether';
+
+createMultiRegionPhoneDetector(['US', 'GB', 'NG']);
+// recognises "(415) 555-2671", "07911 123456", AND "0806 578 6535" in one text
+```
+
 ### Identity pack (opt-in — new in 0.3.0)
 
 Names, dates of birth, passport numbers, and addresses have no
@@ -371,7 +382,38 @@ const sether = new Sether({
 });
 ```
 
-Detectors: `awsAccessKeyDetector`, `openaiKeyDetector`, `anthropicKeyDetector`, `githubPatDetector` (classic + fine-grained), `slackTokenDetector`, `stripeKeyDetector` (live/test/webhook), `jwtDetector`, `highEntropyDetector` (Shannon entropy ≥ 3.5 bits/char).
+Detectors: `awsAccessKeyDetector`, `openaiKeyDetector`, `anthropicKeyDetector`, `githubPatDetector` (classic + fine-grained), `slackTokenDetector`, `stripeKeyDetector` (live/test/webhook), `jwtDetector`, `highEntropyDetector` (Shannon entropy ≥ 3.5 bits/char), and — new in 0.7.0 — `labeledApiKeyDetector` ("my api key is AbC123…", below the entropy floor, no vendor prefix needed) and `labeledPasswordDetector` ("password: hunter2butlonger", with a denylist so "password is required" stays clean).
+
+### Alias engine (new in 0.7.0) — redact by misleading, restore later
+
+Masking hides a value; **aliasing** swaps it for a realistic decoy the LLM
+reads naturally, then reverses it on the way back:
+
+```ts
+import { AliasVault, suggestAliases } from '@raeven-co/sether'; // also on /browser
+
+suggestAliases('NAME', 'Godfrey Lebo');
+// -> ['John Doe', 'Aisha Tanaka', 'Diego Martin']  (distinct, never the original)
+
+const vault = new AliasVault();
+const decoyed = vault.apply('My name is Godfrey Lebo (godfrey@real.com)');
+// stable per-original: every "Godfrey Lebo" becomes the SAME decoy
+const restored = vault.restore(aiReplyEchoingTheDecoy); // real values back
+
+vault.aliasFor('EMAIL', 'godfrey@real.com'); // stable generated decoy
+vault.set('Godfrey Lebo', 'John Doe', 'NAME'); // or pick your own
+```
+
+Decoys come from officially-reserved fictional ranges wherever one exists, so
+they can never collide with a real person's data: US phones `NNN-555-01XX`,
+UK `07700 900XXX` (Ofcom), IPv4 in RFC 5737 TEST-NET, IPv6 `2001:db8::/32`,
+SSNs in the SSA advertising range, RFC 2606 email domains, Luhn-valid
+test-BIN cards. Types with no reserved range (vendor API keys, national IDs,
+custom detectors) fall back to shape-preserving randomisation with known
+vendor prefixes (`sk-proj-`, `AKIA`, `ghp_`, …) kept intact so the decoy stays
+detector-visible. Aliases are unique within a vault by construction, which is
+what makes `restore()` an unambiguous string substitution. Randomness is
+injectable (`{ rng }`) for deterministic tests.
 
 ### SSE / JSON-stream mode
 

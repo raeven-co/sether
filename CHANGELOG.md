@@ -1,5 +1,56 @@
 # Changelog
 
+## 0.7.0 — 2026-08-13
+
+Additive. Prompted by a Sether Shield field report: prompts like "My name is …,
+my number is 0806 578 6535, my api key is …" left the phone and key unredacted,
+and nothing scrubbed could be un-scrubbed. This release closes the detection
+gaps and ships the alias engine that makes reversible decoys possible.
+
+### Added — alias engine (`aliasValue`, `suggestAliases`, `shapeAlias`, `AliasVault`)
+
+Instead of masking a value, replace it with a realistic decoy the LLM reads
+naturally — "Godfrey Lebo" → "John Doe", a real phone → a fictional one — and
+reverse it later. Decoys use officially-reserved fictional ranges wherever one
+exists (US `NNN-555-01XX`, Ofcom `07700 900XXX`, RFC 5737/3849 IPs, SSA ad-range
+SSNs, RFC 2606 email domains, Luhn-valid test-BIN cards), so a decoy can never
+collide with a real person's data. Types without a reserved range fall back to
+shape-preserving randomisation with known vendor prefixes (`sk-proj-`, `AKIA`,
+`ghp_`, …) kept intact so decoys stay detector-visible. `AliasVault` guarantees
+stable per-original aliases and vault-unique decoys, making `restore()` an
+unambiguous string substitution — including on AI replies that echo the decoy.
+Browser-safe (exported from `/browser` too); randomness injectable for tests.
+
+### Added — `createMultiRegionPhoneDetector(countries)`
+
+One PHONE detector covering several regions' national formats at once
+(`['US','GB','NG']` recognises `(415) 555-2671`, `07911 123456`, and
+`0806 578 6535` in the same text), de-duplicated by span. This is what a
+browser-extension caller should use — traffic there mixes regions.
+
+### Added — label-anchored secrets (`labeledApiKeyDetector`, `labeledPasswordDetector`)
+
+Catches the way users actually paste secrets into chat prompts: `my api key is
+AbC123xYz789QwE456` (below the 32-char entropy floor, no vendor prefix) and
+`my password is hunter2butlonger`. Value validators (letter+digit mix for keys;
+mandatory separator + non-secret denylist for passwords) keep prose like "api
+key management" and "password is required" clean. Both are in `secretsDetectors`
+and mapped in `DEFAULT_REGULATION_MAPPINGS` (SOC2 CC6.1, ISO 27001 A.9.4.3).
+
+### Fixed — identity-pack gaps
+
+- DOB: `born on 14/03/1995` now anchors (previously only bare `born`).
+- Address: conversational anchors (`I live at …`, `deliver to …`, `ship to …`)
+  and Commonwealth street suffixes (crescent/cres, gardens/gdns, grove, mews,
+  estate). Verb-shaped suffixes (close/walk/rise) deliberately excluded from
+  standalone detection so "the 3 stores close at 5pm" cannot fire.
+
+### Build & test surface
+
+- Tests: **199 passing** (154 prior + 45 for the alias engine & gap fixes)
+- ReDoS scan: 0 unsafe (212 patterns); lint/typecheck clean
+- Runtime dependencies: 1 (`libphonenumber-js`) — unchanged
+
 ## 0.6.0 — 2026-07-16
 
 Additive. Opt-in `identityDetectors` only; `basicDetectors` and default
