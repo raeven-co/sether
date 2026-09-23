@@ -54,26 +54,84 @@ function randDigits(n: number, rng: Rng): string {
 // decoys surface first in suggestions.
 
 const FIRST_NAMES = [
-  'John', 'Jane', 'Alex', 'Maria', 'David', 'Sarah', 'Michael', 'Amina',
-  'Kwame', 'Chen', 'Yuki', 'Omar', 'Priya', 'Lucas', 'Emma', 'Noah',
-  'Sofia', 'Liam', 'Aisha', 'Diego', 'Ingrid', 'Tunde', 'Mei', 'Ivan',
+  'John',
+  'Jane',
+  'Alex',
+  'Maria',
+  'David',
+  'Sarah',
+  'Michael',
+  'Amina',
+  'Kwame',
+  'Chen',
+  'Yuki',
+  'Omar',
+  'Priya',
+  'Lucas',
+  'Emma',
+  'Noah',
+  'Sofia',
+  'Liam',
+  'Aisha',
+  'Diego',
+  'Ingrid',
+  'Tunde',
+  'Mei',
+  'Ivan',
 ] as const;
 
 const LAST_NAMES = [
-  'Doe', 'Smith', 'Johnson', 'Brown', 'Garcia', 'Miller', 'Davis',
-  'Martinez', 'Lopez', 'Wilson', 'Anderson', 'Taylor', 'Thomas', 'Moore',
-  'Jackson', 'Martin', 'Lee', 'Walker', 'Hall', 'Young', 'Wright',
-  'Adeyemi', 'Okoro', 'Tanaka',
+  'Doe',
+  'Smith',
+  'Johnson',
+  'Brown',
+  'Garcia',
+  'Miller',
+  'Davis',
+  'Martinez',
+  'Lopez',
+  'Wilson',
+  'Anderson',
+  'Taylor',
+  'Thomas',
+  'Moore',
+  'Jackson',
+  'Martin',
+  'Lee',
+  'Walker',
+  'Hall',
+  'Young',
+  'Wright',
+  'Adeyemi',
+  'Okoro',
+  'Tanaka',
 ] as const;
 
 const EMAIL_DOMAINS = ['example.com', 'example.org', 'example.net'] as const;
 
 const STREET_NAMES = [
-  'Cedar', 'Maple', 'Oakwood', 'Riverside', 'Hillcrest', 'Sunset', 'Willow',
-  'Juniper', 'Lakeview', 'Meadow', 'Rosewood', 'Elmwood',
+  'Cedar',
+  'Maple',
+  'Oakwood',
+  'Riverside',
+  'Hillcrest',
+  'Sunset',
+  'Willow',
+  'Juniper',
+  'Lakeview',
+  'Meadow',
+  'Rosewood',
+  'Elmwood',
 ] as const;
 const STREET_SUFFIXES = ['Street', 'Avenue', 'Road', 'Lane', 'Drive', 'Crescent', 'Court'] as const;
-const CITIES = ['Springfield', 'Fairview', 'Riverton', 'Lakeside', 'Greenfield', 'Brookhaven'] as const;
+const CITIES = [
+  'Springfield',
+  'Fairview',
+  'Riverton',
+  'Lakeside',
+  'Greenfield',
+  'Brookhaven',
+] as const;
 
 // ── Shape-preserving fallback ────────────────────────────────────────────────
 
@@ -259,8 +317,18 @@ function aliasDOB(value: string, rng: Rng): string {
   const day = randInt(1, 12, rng); // <=12 so it is valid as either D/M or M/D
   const p2 = (n: number) => String(n).padStart(2, '0');
   const MONTH_NAMES = [
-    'January', 'February', 'March', 'April', 'May', 'June', 'July',
-    'August', 'September', 'October', 'November', 'December',
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
   ];
   if (/^\d{4}-/.test(value)) return `${year}-${p2(month)}-${p2(day)}`;
   if (/^[A-Za-z]/.test(value)) return `${MONTH_NAMES[month - 1]} ${day}, ${year}`;

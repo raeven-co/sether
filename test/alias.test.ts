@@ -1,11 +1,13 @@
 import { describe, it, expect } from 'vitest';
+import { aliasValue, suggestAliases, shapeAlias, AliasVault } from '../src/alias.js';
 import {
-  aliasValue,
-  suggestAliases,
-  shapeAlias,
-  AliasVault,
-} from '../src/alias.js';
-import { emailDetector, creditCardDetector, ipv4Detector, ipv6Detector, ibanDetector, phoneDetector } from '../src/detectors/basic.js';
+  emailDetector,
+  creditCardDetector,
+  ipv4Detector,
+  ipv6Detector,
+  ibanDetector,
+  phoneDetector,
+} from '../src/detectors/basic.js';
 import { openaiKeyDetector, awsAccessKeyDetector, jwtDetector } from '../src/detectors/secrets.js';
 
 // Deterministic rng (mulberry32) so failures reproduce.
@@ -125,7 +127,11 @@ describe('aliasValue — decoys are realistic and never the original', () => {
   });
 
   it('DB_URI keeps the scheme, scrambles credentials and host', () => {
-    const alias = aliasValue('DB_URI', 'mongodb+srv://user:pass@cluster0.mongodb.net/db', rngOpts());
+    const alias = aliasValue(
+      'DB_URI',
+      'mongodb+srv://user:pass@cluster0.mongodb.net/db',
+      rngOpts(),
+    );
     expect(alias.startsWith('mongodb+srv://')).toBe(true);
     expect(alias).not.toContain('cluster0');
   });
@@ -147,12 +153,21 @@ describe('suggestAliases', () => {
 
   it('works for every built-in type without throwing', () => {
     const samples: [string, string][] = [
-      ['EMAIL', 'a@b.com'], ['PHONE', '+2348012345678'], ['CC', '4242424242424242'],
-      ['SSN', '123-45-6789'], ['IPV4', '1.2.3.4'], ['IPV6', '2001:db8::1'],
-      ['IBAN', 'GB82WEST12345698765432'], ['NAME', 'Ada Obi'], ['DOB', '01/02/1990'],
-      ['ADDRESS', '12 Marina Rd, Lagos'], ['PASSPORT', 'A1234567'],
-      ['JWT', 'eyJa.eyJb.c'], ['DB_URI', 'redis://u:p@h:6379'],
-      ['CREDENTIAL', 'TOKEN=abc123'], ['PASSWORD', 'hunter2'],
+      ['EMAIL', 'a@b.com'],
+      ['PHONE', '+2348012345678'],
+      ['CC', '4242424242424242'],
+      ['SSN', '123-45-6789'],
+      ['IPV4', '1.2.3.4'],
+      ['IPV6', '2001:db8::1'],
+      ['IBAN', 'GB82WEST12345698765432'],
+      ['NAME', 'Ada Obi'],
+      ['DOB', '01/02/1990'],
+      ['ADDRESS', '12 Marina Rd, Lagos'],
+      ['PASSPORT', 'A1234567'],
+      ['JWT', 'eyJa.eyJb.c'],
+      ['DB_URI', 'redis://u:p@h:6379'],
+      ['CREDENTIAL', 'TOKEN=abc123'],
+      ['PASSWORD', 'hunter2'],
       ['HIGH_ENTROPY', 'a1B2c3D4e5F6g7H8a1B2c3D4e5F6g7H8'],
     ];
     for (const [type, value] of samples) {

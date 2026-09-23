@@ -119,7 +119,9 @@ describe('addressDetector — prose anchors + Commonwealth suffixes', () => {
   });
 
   it('still fires on real labelled addresses', () => {
-    expect(addressDetector.detect('Address: 12 Marina Road, Lagos').length).toBeGreaterThanOrEqual(1);
+    expect(addressDetector.detect('Address: 12 Marina Road, Lagos').length).toBeGreaterThanOrEqual(
+      1,
+    );
     expect(
       addressDetector.detect('shipping address: 4 Elm Street, Springfield').length,
     ).toBeGreaterThanOrEqual(1);
