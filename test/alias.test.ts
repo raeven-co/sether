@@ -49,15 +49,15 @@ describe('aliasValue — decoys are realistic and never the original', () => {
   });
 
   it('NG intl phone stays NG-shaped', () => {
-    const alias = aliasValue('PHONE', '+2348065786535', rngOpts());
+    const alias = aliasValue('PHONE', '+2348012345678', rngOpts());
     expect(alias).toMatch(/^\+234 803 555 \d{4}$/);
     expect(phoneDetector.detect(alias)).toHaveLength(1);
   });
 
   it('national-format unknown-region phone keeps trunk prefix and shape', () => {
-    const alias = aliasValue('PHONE', '0806 578 6535', rngOpts());
+    const alias = aliasValue('PHONE', '0801 234 5678', rngOpts());
     expect(alias).toMatch(/^08\d{2} \d{3} \d{4}$/);
-    expect(alias).not.toBe('0806 578 6535');
+    expect(alias).not.toBe('0801 234 5678');
   });
 
   it('CC is Luhn-valid, 16 digits, grouping mirrors original', () => {
@@ -147,7 +147,7 @@ describe('suggestAliases', () => {
 
   it('works for every built-in type without throwing', () => {
     const samples: [string, string][] = [
-      ['EMAIL', 'a@b.com'], ['PHONE', '+2348065786535'], ['CC', '4242424242424242'],
+      ['EMAIL', 'a@b.com'], ['PHONE', '+2348012345678'], ['CC', '4242424242424242'],
       ['SSN', '123-45-6789'], ['IPV4', '1.2.3.4'], ['IPV6', '2001:db8::1'],
       ['IBAN', 'GB82WEST12345698765432'], ['NAME', 'Ada Obi'], ['DOB', '01/02/1990'],
       ['ADDRESS', '12 Marina Rd, Lagos'], ['PASSPORT', 'A1234567'],
@@ -207,15 +207,15 @@ describe('AliasVault', () => {
     const vault = new AliasVault();
     vault.set('Godfrey Lebo', 'John Doe', 'NAME');
     vault.set('emory@gmail.com', 'jane.doe@example.org', 'EMAIL');
-    vault.set('+2348065786535', '+234 803 555 1234', 'PHONE');
+    vault.set('+2348012345678', '+234 803 555 1234', 'PHONE');
 
     const original =
       'My name is Godfrey Lebo, my email address is emory@gmail.com, ' +
-      'call me on +2348065786535. Sign off as Godfrey Lebo.';
+      'call me on +2348012345678. Sign off as Godfrey Lebo.';
     const applied = vault.apply(original);
     expect(applied).not.toContain('Godfrey Lebo');
     expect(applied).not.toContain('emory@gmail.com');
-    expect(applied).not.toContain('+2348065786535');
+    expect(applied).not.toContain('+2348012345678');
     expect(applied).toContain('John Doe');
     // Multiple mentions all use the same alias, and the trip reverses cleanly.
     expect(applied.match(/John Doe/g)).toHaveLength(2);

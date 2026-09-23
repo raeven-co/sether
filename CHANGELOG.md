@@ -1,9 +1,15 @@
 # Changelog
 
+## 0.7.1 — 2026-09-23
+
+Documentation-only patch: the example phone number used across the README,
+changelog and tests since 0.7.0 has been replaced with a fabricated one.
+No code changes; no behavioural difference.
+
 ## 0.7.0 — 2026-08-13
 
 Additive. Prompted by a Sether Shield field report: prompts like "My name is …,
-my number is 0806 578 6535, my api key is …" left the phone and key unredacted,
+my number is 0801 234 5678, my api key is …" left the phone and key unredacted,
 and nothing scrubbed could be un-scrubbed. This release closes the detection
 gaps and ships the alias engine that makes reversible decoys possible.
 
@@ -25,7 +31,7 @@ Browser-safe (exported from `/browser` too); randomness injectable for tests.
 
 One PHONE detector covering several regions' national formats at once
 (`['US','GB','NG']` recognises `(415) 555-2671`, `07911 123456`, and
-`0806 578 6535` in the same text), de-duplicated by span. This is what a
+`0801 234 5678` in the same text), de-duplicated by span. This is what a
 browser-extension caller should use — traffic there mixes regions.
 
 ### Added — label-anchored secrets (`labeledApiKeyDetector`, `labeledPasswordDetector`)

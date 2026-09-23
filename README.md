@@ -179,7 +179,7 @@ runs a libphonenumber pass per region and de-duplicates by span:
 import { createMultiRegionPhoneDetector } from '@raeven-co/sether';
 
 createMultiRegionPhoneDetector(['US', 'GB', 'NG']);
-// recognises "(415) 555-2671", "07911 123456", AND "0806 578 6535" in one text
+// recognises "(415) 555-2671", "07911 123456", AND "0801 234 5678" in one text
 ```
 
 ### Identity pack (opt-in — new in 0.3.0)

@@ -12,15 +12,15 @@ describe('createMultiRegionPhoneDetector', () => {
   const detector = createMultiRegionPhoneDetector(['US', 'NG', 'GB']);
 
   it('detects national-format numbers for every configured region', () => {
-    expect(detector.detect('call me on 08065786535')).toHaveLength(1);
-    expect(detector.detect('my number is 0806 578 6535')).toHaveLength(1);
+    expect(detector.detect('call me on 08012345678')).toHaveLength(1);
+    expect(detector.detect('my number is 0801 234 5678')).toHaveLength(1);
     expect(detector.detect('call me at (415) 555-2671')).toHaveLength(1);
     expect(detector.detect('my number is 415-555-2671')).toHaveLength(1);
     expect(detector.detect('ring 07911 123456 today')).toHaveLength(1);
   });
 
   it('still detects international format', () => {
-    expect(detector.detect('reach me on +2348065786535')).toHaveLength(1);
+    expect(detector.detect('reach me on +2348012345678')).toHaveLength(1);
   });
 
   it('de-duplicates a number found by multiple passes', () => {
@@ -110,7 +110,7 @@ describe('addressDetector — prose anchors + Commonwealth suffixes', () => {
     // as one giant ADDRESS match once the line contained a digit or comma.
     expect(
       addressDetector.detect(
-        'my email address is emory@gmail.com, call me on 08065786535. Regards, Godfrey',
+        'my email address is emory@gmail.com, call me on 08012345678. Regards, Godfrey',
       ),
     ).toHaveLength(0);
     expect(addressDetector.detect('IP address: 10.0.0.1 is unreachable')).toHaveLength(0);
