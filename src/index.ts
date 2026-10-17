@@ -62,9 +62,15 @@ export class Sether {
 // Core
 export { MemoryVault, createRedactStream, createRestoreStream };
 export { redactSync } from './stream/redact.js';
-export { restoreSync } from './stream/restore.js';
+export {
+  restoreSync,
+  restoreJson,
+  restoreJsonValue,
+  UnresolvedTokenError,
+} from './stream/restore.js';
+export { TOKEN_RE } from './token.js';
 export type { RedactSyncOptions } from './stream/redact.js';
-export type { RestoreSyncOptions } from './stream/restore.js';
+export type { RestoreSyncOptions, JsonValue } from './stream/restore.js';
 
 // Detectors — basic pack
 export {

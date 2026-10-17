@@ -1,4 +1,5 @@
 import { redactSync, type RedactSyncOptions } from '../stream/redact.js';
+import { restoreJsonDocument } from '../stream/restore.js';
 import { TOKEN_RE } from '../token.js';
 import type { Vault } from '../vault/types.js';
 
@@ -27,6 +28,11 @@ import type { Vault } from '../vault/types.js';
 //    // The message that left your process had `<EMAIL_...>` instead.
 //    // `completion.choices[0].message.content` has any tokens the model
 //    // echoed back restored to the original PII.
+//
+//  When the request asks for JSON output (`response_format` `json_object` /
+//  `json_schema`), `message.content` is restored value by value instead of as
+//  text, and left tokenized if it is not valid JSON. Tool-call arguments stay
+//  tokenized unless `restoreToolArguments` is set.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export interface WrapOpenAIOptions {
@@ -34,6 +40,21 @@ export interface WrapOpenAIOptions {
   vault: Vault;
   /** Synchronous restore — true by default. */
   restoreResponses?: boolean;
+  /**
+   * Also restore `choices[].message.tool_calls[].function.arguments` in
+   * non-streaming responses, value by value so an original cannot change the
+   * arguments' JSON structure. Arguments that are not valid JSON are left
+   * tokenized. Default `false`: arguments stay tokenized. Restored arguments
+   * carry real PII into your tool code, and a model can still put a real token
+   * in the wrong field, so validate them before acting on them.
+   */
+  restoreToolArguments?: boolean;
+}
+
+interface RestoreMode {
+  /** The request asked for JSON output, so `content` is a JSON document. */
+  jsonContent: boolean;
+  toolArguments: boolean;
 }
 
 // Minimal duck-typed surface. We avoid importing the OpenAI types at all
@@ -55,7 +76,11 @@ export function wrapOpenAI<C extends OpenAILike>(client: C, opts: WrapOpenAIOpti
     const [request, ...rest] = args;
     const redactedRequest = request ? redactRequest(request, redactOpts) : request;
     const response = await originalCreate(redactedRequest, ...rest);
-    return restore ? restoreResponse(response, opts.vault) : response;
+    if (!restore) return response;
+    return restoreResponse(response, opts.vault, {
+      jsonContent: requestsJsonOutput(request),
+      toolArguments: opts.restoreToolArguments ?? false,
+    });
   } as typeof client.chat.completions.create;
 
   return client;
@@ -103,33 +128,68 @@ function redactMessage(msg: unknown, opts: RedactSyncOptions): unknown {
   return msg;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function requestsJsonOutput(req: unknown): boolean {
+  if (!isRecord(req) || !isRecord(req.response_format)) return false;
+  const type = req.response_format.type;
+  return type === 'json_object' || type === 'json_schema';
+}
+
 // Walk the response and restore tokens in `choices[].message.content` and
 // `choices[].delta.content` (streaming chunks).
-function restoreResponse(res: unknown, vault: Vault): unknown {
+function restoreResponse(res: unknown, vault: Vault, mode: RestoreMode): unknown {
   if (!res || typeof res !== 'object') return res;
   const r = res as Record<string, unknown>;
   const choices = r.choices;
   if (!Array.isArray(choices)) return res;
   return {
     ...r,
-    choices: choices.map((c) => restoreChoice(c, vault)),
+    choices: choices.map((c) => restoreChoice(c, vault, mode)),
   };
 }
 
-function restoreChoice(choice: unknown, vault: Vault): unknown {
+function restoreChoice(choice: unknown, vault: Vault, mode: RestoreMode): unknown {
   if (!choice || typeof choice !== 'object') return choice;
   const c = choice as Record<string, unknown>;
   const out: Record<string, unknown> = { ...c };
   for (const key of ['message', 'delta'] as const) {
+    // A JSON-mode delta is a fragment of a document: it cannot be restored
+    // safely on its own, so it stays tokenized.
+    if (key === 'delta' && mode.jsonContent) continue;
     const v = c[key];
     if (v && typeof v === 'object') {
       const inner = v as Record<string, unknown>;
       if (typeof inner.content === 'string') {
-        out[key] = { ...inner, content: restoreInPlace(inner.content, vault) };
+        const content = mode.jsonContent
+          ? restoreJsonText(inner.content, vault)
+          : restoreInPlace(inner.content, vault);
+        out[key] = { ...inner, content };
       }
     }
   }
+  if (mode.toolArguments && isRecord(out.message) && Array.isArray(out.message.tool_calls)) {
+    out.message = {
+      ...out.message,
+      tool_calls: out.message.tool_calls.map((call) => restoreToolCall(call, vault)),
+    };
+  }
   return out;
+}
+
+function restoreToolCall(call: unknown, vault: Vault): unknown {
+  if (!isRecord(call) || !isRecord(call.function)) return call;
+  const fn = call.function;
+  if (typeof fn.arguments !== 'string') return call;
+  return { ...call, function: { ...fn, arguments: restoreJsonText(fn.arguments, vault) } };
+}
+
+// Serialized JSON: restored value by value, or left tokenized if it is not
+// valid JSON (never restored as text).
+function restoreJsonText(text: string, vault: Vault): string {
+  return restoreJsonDocument(text, (value) => restoreInPlace(value, vault)) ?? text;
 }
 
 function restoreInPlace(text: string, vault: Vault): string {

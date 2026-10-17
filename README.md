@@ -48,7 +48,7 @@ deterministic streaming redaction today.
 The live sandbox runs the same detection engine in your browser — paste
 any text, watch the PII tokens get swapped in real time:
 
-- **Live sandbox:** <https://setherai.vercel.app/#sandbox>
+- **Live sandbox:** <https://sether.raevenmarket.com.ng/sandbox>
 
 The sandbox is a browser-only demonstration of `@raeven-co/sether`. For production, install the package below.
 
@@ -65,7 +65,7 @@ Requires Node 18+. ESM and CommonJS both supported.
 **Using Python?** The same engine ships as the [`sether`](https://pypi.org/project/sether/)
 package on PyPI (`pip install sether`), with sync + async streaming and
 httpx / ASGI / WSGI / OpenAI / Anthropic integrations. Docs:
-<https://setherai.vercel.app/docs/python>.
+<https://sether.raevenmarket.com.ng/docs/python>.
 
 ---
 
@@ -94,6 +94,12 @@ The same `Sether` instance shares its vault between `.redact()` and
 `.restore()`, which is how the round-trip identity is preserved across
 streaming chunks.
 
+> **Security: never call `restore()` / `restoreSync()` on serialized JSON**
+> (tool-call arguments, JSON-mode replies, JSON response bodies). Restore is
+> plain text substitution: an original value containing `"` or `\` can add keys
+> to the document or break it. Use `restoreJson` / `restoreJsonValue`, see
+> [Never restore serialized JSON as text](#never-restore-serialized-json-as-text).
+
 ### End-to-end round-trip example
 
 ```ts
@@ -121,6 +127,95 @@ const restored = await streamToString(
 
 console.log(restored === original); // true
 ```
+
+---
+
+## Never restore serialized JSON as text
+
+`restoreSync`, `createRestoreStream` and `sether.restore()` are **plain text
+substitution**: each original value is inserted exactly as it was, unescaped.
+If the text is serialized JSON, such as LLM tool-call arguments, a JSON-mode
+reply or a JSON response body, an original containing `"` or `\` stops being
+data inside a string and becomes part of the document:
+
+```ts
+// Tool-call arguments from the model reference a token…
+const args = '{"to":"<EMAIL_…>","subject":"Hello <NAME_…>"}';
+// …whose original is:  Alice", "bcc": "attacker@example.com
+JSON.parse(restoreSync(args, { vault }));
+// → { to: 'bob@example.com', subject: 'Hello Alice', bcc: 'attacker@example.com' }
+```
+
+Built-in detectors can capture a trailing backslash (`password: hunter2\`),
+which breaks the document the same way; custom detectors and vaults filled from
+other systems can carry any character. Restore JSON value by value instead:
+
+```ts
+import { restoreJson, restoreJsonValue } from '@raeven-co/sether';
+
+// Serialized JSON in, serialized JSON out: each string value is restored and re-escaped.
+const safeArgs = restoreJson(toolCall.function.arguments, { vault, strict: true });
+
+// Already parsed, e.g. an Anthropic tool_use block's `input`.
+const input = restoreJsonValue(block.input, { vault, strict: true });
+```
+
+- Object keys are never restored. Invalid JSON throws `SyntaxError`; there is
+  no fallback to text replacement.
+- One level at a time: a string value that itself holds serialized JSON is
+  restored as plain text, so parse and restore it separately.
+- `restoreJson` re-serializes compactly, and integers beyond
+  `Number.MAX_SAFE_INTEGER` lose precision through `JSON.parse`. If that
+  matters, parse with your own reviver and call `restoreJsonValue`.
+- `strict: true` (also accepted by `restoreSync`) throws `UnresolvedTokenError`
+  when anything token-shaped would be left in place: an invented or expired
+  token, a case-altered copy such as `<email_…>`, or a token in a key. Its
+  `tokens` property lists them; restored originals are never included. Without
+  `strict`, those pass through silently.
+- Strict mode is not authorization. A model can still put a real token in the
+  wrong field (the customer's address in `bcc`), so validate tool arguments
+  before acting on them.
+- `TOKEN_RE` is exported if you need to scan for tokens yourself.
+
+**Sether's own restore paths restore JSON value by value.** They change only
+the string values that hold a token and re-encode just those, so every other
+byte is kept (formatting, key order, escapes, and integers beyond
+`Number.MAX_SAFE_INTEGER`). Object keys are never restored.
+
+- `createSSERestoreStream`: a `data:` payload that parses as JSON (OpenAI and
+  Anthropic chunks) is restored value by value, so an original containing `"`,
+  `\` or a line break can't change the JSON or break the SSE framing. Other
+  payloads (`[DONE]`, plain text) are restored as text, and a line break in an
+  original continues it on a new `data: ` line (the client receives it as
+  `\n`). Each `data:` line is handled on its own, so a JSON payload split
+  across several `data:` lines is restored as text.
+- `wrapFetch`: an `event-stream` body is restored per `data:` payload as above.
+  A body that parses as JSON is restored value by value, a JSON-typed body that
+  doesn't (NDJSON, JSON Lines) line by line, and any other text body as text.
+- `createExpressMiddleware`: a string passed to `res.send()` that parses as JSON
+  is restored value by value, including the string Express's own `res.json()`
+  hands to `res.send()`. Other strings are restored as text. Objects passed to
+  `res.json()` / `res.send()` were already restored value by value.
+- `wrapOpenAI` / `wrapAnthropic`: when the request asks for JSON output
+  (`response_format` `json_object` / `json_schema`, or Anthropic
+  `output_config.format` / `output_format` with `json_schema`), the reply's
+  content is restored value by value, and left tokenized if it isn't valid
+  JSON. Tool-call arguments stay tokenized by default. Set
+  `restoreToolArguments: true` to restore non-streaming
+  `tool_calls[].function.arguments` and `tool_use.input` value by value, and
+  validate them before acting on them.
+
+What is still restored as text:
+
+- **JSON-mode output streamed over SSE.** `createSSERestoreStream` (and
+  `wrapFetch` on an event-stream body) keeps each chunk valid, but the
+  `delta.content` fragments join into a second JSON document the stream can't
+  see, so an original lands in that document unescaped. Don't SSE-restore
+  JSON-mode streams: collect the tokenized fragments and call `restoreJson` on
+  the assembled text.
+- `restoreSync`, `createRestoreStream` and `sether.restore()`, by design.
+- `AliasVault.restore()` swaps decoys back by plain substitution too. On JSON,
+  apply it to each parsed string value, never to the serialized document.
 
 ---
 
@@ -328,10 +423,10 @@ const sether = new Sether({ safeDistanceBytes: 4096 }); // e.g. for large JWTs
 ## What's verified in this release
 
 - **Streaming-safe:** chunk-boundary round-trip proven by property-based tests
-- **ReDoS-safe:** all regex literals scanned by `safe-regex2` in CI (161 patterns, 0 unsafe)
+- **ReDoS-safe:** all regex literals scanned by `safe-regex2` in CI (224 patterns, 0 unsafe)
 - **TypeScript strict mode:** no `any`, no implicit types
-- **Dual build:** ESM + CJS, ≈ 36 KB each
-- **CI matrix:** Node 18 / 20 / 22 / 24 — lint, typecheck, format, regex-safety, 147 tests, build
+- **Dual build:** ESM + CJS, ≈ 61 KB each
+- **CI matrix:** Node 20 / 22 / 24 — lint, typecheck, format, regex-safety, 252 tests, build (the package still runs on Node 18; the test tooling needs 20+)
 - **MIT licensed** — fork it, audit it, no vendor lock-in
 
 ---
@@ -346,6 +441,7 @@ Known limitations in this release:
 - **Credit-card regex is permissive.** Anything 13–23 chars of digits/spaces/dashes is a candidate, then validated by Luhn. False positives in dense numeric content are possible.
 - **Names / DOB / passport / address are label-anchored, not free-text NER.** The opt-in identity pack (0.3.0) catches these when they appear with a label or distinctive structure. Unlabelled names / organisations / locations in running prose need the ONNX NER model shipping separately as `@raeven-co/sether-ner`.
 - **Very large whitespace-free values split across chunk boundaries.** The streaming redactor holds an in-progress value back up to `max(safeDistanceBytes × 4, 8192)` bytes; a single value larger than that bound, split across two chunks, can still be emitted partially. Raise `safeDistanceBytes` or use `redactSync` on complete payloads. See [Streaming safety](#streaming-safety).
+- **Restore is text substitution.** `restoreSync` and the restore streams insert originals unescaped. The SSE, fetch, Express and SDK-wrapper paths restore JSON value by value, except JSON-mode output streamed over SSE. Use `restoreJson` for your own JSON; see [Never restore serialized JSON as text](#never-restore-serialized-json-as-text).
 - **No production benchmarks yet.** Throughput numbers (vs Microsoft Presidio) will land alongside the NER package.
 
 ---
@@ -484,7 +580,7 @@ import { ConsoleAuditSink, MemoryAuditSink, DEFAULT_REGULATION_MAPPINGS } from '
 
 ### `redactSync(text, { detectors, vault })` / `restoreSync(text, { vault })`
 
-Synchronous one-shot redaction and restoration for cases where you have the full text in hand (a JSON field, a log line, an SSE payload) and don't need chunk-boundary buffering. `restoreSync` is the mirror of `redactSync`: it swaps `<TYPE_…>` tokens back to their originals via the vault, leaving any token with no vault entry untouched.
+Synchronous one-shot redaction and restoration for cases where you have the full text in hand (a log line, a decoded JSON string value) and don't need chunk-boundary buffering. `restoreSync` is the mirror of `redactSync`: it swaps `<TYPE_…>` tokens back to their originals via the vault, leaving any token with no vault entry untouched (pass `strict: true` to throw `UnresolvedTokenError` instead). For serialized JSON use `restoreJson` — see [Never restore serialized JSON as text](#never-restore-serialized-json-as-text).
 
 ```ts
 import { redactSync, restoreSync, basicDetectors, MemoryVault } from '@raeven-co/sether';
@@ -542,8 +638,8 @@ Email `emorylebo@gmail.com`.
 
 ## Links
 
-- **Live sandbox:** <https://setherai.vercel.app/#sandbox>
+- **Live sandbox:** <https://sether.raevenmarket.com.ng/sandbox>
 - **GitHub:** <https://github.com/raeven-co/sether>
 - **npm:** <https://www.npmjs.com/package/@raeven-co/sether>
-- **PyPI (Python port):** <https://pypi.org/project/sether/> · [docs](https://setherai.vercel.app/docs/python)
+- **PyPI (Python port):** <https://pypi.org/project/sether/> · [docs](https://sether.raevenmarket.com.ng/docs/python)
 - **Issues:** <https://github.com/raeven-co/sether/issues>

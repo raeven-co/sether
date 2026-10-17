@@ -3,7 +3,7 @@ import { TOKEN_RE } from '../token.js';
 import type { Detector } from '../detectors/types.js';
 import type { Vault } from '../vault/types.js';
 import { createRedactStream } from '../stream/redact.js';
-import { createRestoreStream } from '../stream/restore.js';
+import { createRestoreStream, restoreJsonOrText } from '../stream/restore.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Express middleware
@@ -62,12 +62,16 @@ export function createExpressMiddleware(opts: ExpressMiddlewareOptions) {
       // does not await them; an async override returns a pending Promise, so the
       // real send fires a microtask later and an unrestored body can go out
       // first or a double-send / "headers already sent" can occur.
+      //
+      // A string body that parses as JSON (including the string Express's own
+      // res.json hands to res.send) is restored value by value, never as text.
+      const restoreString = (text: string): string => restoreStringSync(text, opts.vault);
       const originalSend = res.send.bind(res);
       const originalJson = res.json.bind(res);
 
       res.send = function (body?: unknown) {
         if (typeof body === 'string') {
-          body = restoreStringSync(body, opts.vault);
+          body = restoreJsonOrText(body, restoreString);
         } else if (body && typeof body === 'object') {
           body = restoreJsonValueSync(body, opts.vault);
         }
@@ -129,17 +133,29 @@ function restoreStringSync(text: string, vault: Vault): string {
   });
 }
 
+// Only strings, arrays and plain objects are walked. Anything else (a Buffer or
+// typed array sent as binary, a Date or other value with its own toJSON, a class
+// instance) is returned as is: copying its own properties into a plain object
+// would turn a Buffer into `{0: .., 1: ..}` and a Date into `{}`.
 function restoreJsonValueSync(value: unknown, vault: Vault): unknown {
   if (typeof value === 'string') return restoreStringSync(value, vault);
   if (Array.isArray(value)) return value.map((v) => restoreJsonValueSync(v, vault));
-  if (value && typeof value === 'object') {
-    const out: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
-      out[k] = restoreJsonValueSync(v, vault);
-    }
-    return out;
+  if (isPlainObject(value)) {
+    // Object.fromEntries defines own properties, so a "__proto__" key from
+    // JSON.parse stays data instead of becoming the result's prototype.
+    return Object.fromEntries(
+      Object.entries(value).map(([k, v]) => [k, restoreJsonValueSync(v, vault)]),
+    );
   }
   return value;
+}
+
+// A plain object is what JSON.parse or an object literal produces: its
+// prototype is Object.prototype, or null for Object.create(null).
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  if (value === null || typeof value !== 'object') return false;
+  const proto: unknown = Object.getPrototypeOf(value);
+  return proto === Object.prototype || proto === null;
 }
 
 async function mapJson(value: unknown, mapStr: (s: string) => Promise<string>): Promise<unknown> {
@@ -148,11 +164,13 @@ async function mapJson(value: unknown, mapStr: (s: string) => Promise<string>): 
     return Promise.all(value.map((v) => mapJson(v, mapStr)));
   }
   if (value && typeof value === 'object') {
-    const out: Record<string, unknown> = {};
+    const entries: Array<[string, unknown]> = [];
     for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
-      out[k] = await mapJson(v, mapStr);
+      entries.push([k, await mapJson(v, mapStr)]);
     }
-    return out;
+    // Defines own properties: a client-sent "__proto__" key must stay data,
+    // never become req.body's prototype.
+    return Object.fromEntries(entries);
   }
   return value;
 }

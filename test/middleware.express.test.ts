@@ -84,4 +84,90 @@ describe('createExpressMiddleware', () => {
     expect(ret).toBe(res);
     expect(res.sent).toEqual({ note: 'address is carol@example.com', ok: true });
   });
+
+  it('passes binary res.send bodies through untouched', async () => {
+    const vault = new MemoryVault();
+    const mw = createExpressMiddleware({ detectors: basicDetectors, vault });
+    const res = makeRes();
+    await mw({ body: undefined }, res, () => {});
+
+    const buffer = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
+    res.send(buffer);
+    expect(res.sent).toBe(buffer);
+
+    const bytes = new Uint8Array([1, 2, 3]);
+    res.send(bytes);
+    expect(res.sent).toBe(bytes);
+  });
+
+  it('keeps non-plain objects in a JSON response and restores the plain ones', async () => {
+    const vault = new MemoryVault();
+    const mw = createExpressMiddleware({ detectors: basicDetectors, vault });
+
+    const req: { body: unknown } = { body: 'see dave@example.com' };
+    const res = makeRes();
+    await mw(req, res, () => {});
+
+    const token = (req.body as string).match(/<EMAIL_[0-9a-f-]+>/)?.[0];
+    if (token === undefined) throw new Error('expected an EMAIL token');
+
+    const sentAt = new Date('2026-10-14T00:00:00.000Z');
+    const attachment = Buffer.from('raw');
+    const meta: Record<string, unknown> = Object.create(null);
+    meta.to = token;
+
+    res.json({ sentAt, attachment, meta, items: [{ to: token }] });
+
+    const sent = res.sent as Record<string, unknown>;
+    expect(sent.sentAt).toBe(sentAt);
+    expect(sent.attachment).toBe(attachment);
+    expect(sent.meta).toEqual({ to: 'dave@example.com' });
+    expect(sent.items).toEqual([{ to: 'dave@example.com' }]);
+    expect(JSON.stringify(sent)).toContain('"sentAt":"2026-10-14T00:00:00.000Z"');
+  });
+
+  it('restores a non-plain object through the string Express res.json hands to res.send', async () => {
+    const vault = new MemoryVault();
+    const mw = createExpressMiddleware({ detectors: basicDetectors, vault });
+
+    // Like Express: res.json serializes the body and calls this.send(string).
+    const res = makeRes();
+    res.json = function (body?: unknown) {
+      return this.send(JSON.stringify(body));
+    };
+    const req: { body: unknown } = { body: 'see erin@example.com' };
+    await mw(req, res, () => {});
+
+    const token = (req.body as string).match(/<EMAIL_[0-9a-f-]+>/)?.[0];
+    if (token === undefined) throw new Error('expected an EMAIL token');
+
+    class Reply {
+      constructor(readonly to: string) {}
+    }
+    res.json(new Reply(token));
+
+    expect(JSON.parse(String(res.sent))).toEqual({ to: 'erin@example.com' });
+  });
+
+  it('keeps a "__proto__" key in JSON bodies as data, never as the prototype', async () => {
+    const vault = new MemoryVault();
+    const mw = createExpressMiddleware({ detectors: basicDetectors, vault });
+
+    // What express.json() produces for a client-sent "__proto__" key: an own property.
+    const req: { body: unknown } = {
+      body: JSON.parse('{"__proto__":{"isAdmin":true},"note":"mail alice@example.com"}'),
+    };
+    const res = makeRes();
+    await mw(req, res, () => {});
+
+    const body = req.body as Record<string, unknown>;
+    expect(Object.getPrototypeOf(body)).toBe(Object.prototype);
+    expect(body.isAdmin).toBeUndefined();
+    expect(Object.keys(body)).toEqual(['__proto__', 'note']);
+
+    res.json(JSON.parse('{"__proto__":{"isAdmin":true},"to":"x"}'));
+    const sent = res.sent as Record<string, unknown>;
+    expect(Object.getPrototypeOf(sent)).toBe(Object.prototype);
+    expect(sent.isAdmin).toBeUndefined();
+  });
 });

@@ -1,5 +1,125 @@
 # Changelog
 
+## 0.8.0 — 2026-10-17
+
+Security fix. Also carries 0.7.1 (docs only), which was tagged but never
+published to npm. The new API is additive; Sether's own SSE, fetch, Express and
+SDK-wrapper restore paths change output only where they used to splice an
+original into JSON as text (see "Fixed" below). Found 2026-10-14 while building
+`n8n-nodes-sether`: restoring tokens inside **serialized JSON** with
+`restoreSync` (or `sether.restore()`) inserts original values unescaped. An
+original containing `"` can add keys to the document: a name of
+`Alice", "bcc": "attacker@example.com` restored into tool-call arguments adds a
+`bcc` recipient. An original ending in `\` breaks the document, and the built-in
+`labeledPasswordDetector` and `addressDetector` can capture a trailing
+backslash. `restoreSync`'s default behaviour is unchanged; code that restores
+JSON must switch to the new helpers.
+
+### Added: JSON-aware restore (`restoreJson`, `restoreJsonValue`)
+
+`restoreJson(json, { vault })` parses the document, restores each string value
+on its own and re-serializes, so `JSON.stringify` escapes originals instead of
+splicing them into the text. Object keys are never restored. Invalid JSON
+throws `SyntaxError` with no fallback to text replacement. Tokens whose angle
+brackets a serializer escaped as `\u003c` / `\u003e` are still restored.
+`restoreJsonValue(value, { vault })` does the same for an already-parsed value:
+it returns a new value and keeps a `"__proto__"` key as data. The `JsonValue`
+type is exported.
+
+### Added: strict mode (`strict: true`, `UnresolvedTokenError`)
+
+Accepted by `restoreSync`, `restoreJson` and `restoreJsonValue`; default
+`false`. Rather than silently leaving token-shaped text in place, it throws
+`UnresolvedTokenError` listing every token that would survive: well-formed
+tokens the vault cannot resolve (invented, expired, or from another vault),
+case-altered copies (`<email_…>`), and tokens in object keys. The error carries
+tokens only, never originals.
+
+### Added: `TOKEN_RE` exported
+
+The canonical token pattern is public, so integrations no longer mirror it.
+
+### Fixed: Sether's own restore paths no longer splice originals into JSON
+
+These paths now restore JSON value by value, in place: only the string values
+that hold a token are decoded, restored and re-encoded, so every other byte is
+kept (formatting, key order, escapes, and integers beyond
+`Number.MAX_SAFE_INTEGER`). Object keys are never restored. Output changes only
+where a restored value is re-escaped, a token was escaped as `\u003c…\u003e`
+(now restored), a token sat in a key (no longer restored), or JSON-mode content
+is not valid JSON (now left tokenized).
+
+- `createSSERestoreStream`: a `data:` payload that parses as JSON is restored
+  value by value, so an original containing `"`, `\` or a line break can no
+  longer change the chunk or inject SSE lines. Other payloads (`[DONE]`, plain
+  text) are still restored as text. The `it.fails` marker is gone.
+- `createSSERestoreStream` and `wrapFetch` on an `event-stream` body: in a
+  `data:` payload that is not JSON, a line break (`\n`, `\r` or `\r\n`) in an
+  original used to end the line, so the rest of the original could inject
+  `event:` / `id:` / `data:` fields or a blank line that dispatches the event
+  early. The original now continues on a new `data: ` line, in the line ending
+  of the stream. The client joins data lines with `\n`, so CR and CRLF in an
+  original arrive as `\n`. Output is byte-identical when no original has a
+  line break.
+- `wrapFetch`: `event-stream` bodies are restored per `data:` payload; a body
+  that parses as JSON value by value; a JSON-typed body that doesn't (NDJSON,
+  JSON Lines) line by line, with lines that are not valid JSON left tokenized
+  so an original can't complete a truncated document into a different one;
+  other text as text.
+- `createExpressMiddleware`: a string passed to `res.send()` that parses as
+  JSON is restored value by value. This also covers the string Express's own
+  `res.json()` passes to `res.send()`, where a token in a key used to be
+  restored as text.
+- `wrapOpenAI` / `wrapAnthropic`: when the request asks for JSON output
+  (`response_format` `json_object` / `json_schema`; Anthropic
+  `output_config.format` or the deprecated `output_format` with `json_schema`),
+  `message.content` / text blocks are restored value by value, and left
+  tokenized if they aren't valid JSON.
+
+### Added: `restoreToolArguments` on `wrapOpenAI` / `wrapAnthropic`
+
+Opt-in, default `false`, so tool-call arguments still stay tokenized by default
+(tests pin this). When `true`, non-streaming
+`choices[].message.tool_calls[].function.arguments` are restored value by value
+(left tokenized if not valid JSON), and `tool_use.input` through
+`restoreJsonValue`. Restored arguments carry real PII into tool code; validate
+them before acting.
+
+### Fixed: Express middleware no longer rewrites binary and non-plain bodies
+
+`res.send()` and `res.json()` copied every object into a plain object before
+restoring it, so `res.send(buffer)` sent `{"0":..,"1":..}` instead of the bytes
+and a `Date` inside a JSON body became `{}`. Only arrays and plain objects
+(including `Object.create(null)`) are walked now. Buffers, typed arrays, Dates
+and other non-plain objects pass through unchanged, nested ones included. With
+real Express, tokens inside non-plain objects given to `res.json()` are still
+restored, from the string `res.json()` hands to `res.send()`.
+
+### Fixed: Express middleware kept a client-sent `"__proto__"` key as the prototype
+
+Present since the middleware shipped. Rebuilding `req.body` (and objects passed
+to `res.json()` / `res.send()`) with `out[key] = …` turned a `"__proto__"` key
+from `express.json()` into the new object's prototype. A request body of
+`{"__proto__": {"isAdmin": true}}` therefore gave `req.body.isAdmin === true`
+while `Object.keys(req.body)` didn't list it, which can slip past own-key
+validation. Both walkers now define own properties, so the key stays data,
+exactly as `JSON.parse` produced it.
+
+### Still text-only
+
+- JSON-mode output streamed over SSE: each chunk stays valid, but the
+  `delta.content` fragments join into a second JSON document the stream can't
+  see. Collect the tokenized fragments and call `restoreJson` on the result.
+- `restoreSync`, `createRestoreStream` and `sether.restore()`, by design.
+- `AliasVault.restore()` is plain substitution as well; the README says to apply
+  it per parsed string value on JSON.
+
+### Build & test surface
+
+- Tests: **252 passing**, no expected failures (201 prior)
+- ReDoS scan: 0 unsafe (224 patterns); typecheck, lint, format, ASCII-dist clean
+- Runtime dependencies: 1 (`libphonenumber-js`), unchanged
+
 ## 0.7.1 — 2026-09-23
 
 Documentation-only patch: the example phone number used across the README,

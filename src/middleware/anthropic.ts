@@ -1,4 +1,5 @@
 import { redactSync, type RedactSyncOptions } from '../stream/redact.js';
+import { restoreJsonDocument, restoreJsonValue, type JsonValue } from '../stream/restore.js';
 import { TOKEN_RE } from '../token.js';
 import type { Vault } from '../vault/types.js';
 
@@ -25,6 +26,11 @@ import type { Vault } from '../vault/types.js';
 //    });
 //    // The request to Anthropic carried `<EMAIL_...>`; the response has
 //    // anything the model echoed back restored.
+//
+//  When the request asks for JSON output (`output_config.format` or the
+//  deprecated `output_format`, type `json_schema`), text blocks are restored
+//  value by value instead of as text, and left tokenized if they are not valid
+//  JSON. `tool_use` input stays tokenized unless `restoreToolArguments` is set.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export interface WrapAnthropicOptions {
@@ -32,6 +38,20 @@ export interface WrapAnthropicOptions {
   vault: Vault;
   /** Synchronous restore — true by default. */
   restoreResponses?: boolean;
+  /**
+   * Also restore the `input` of `tool_use` blocks in non-streaming responses,
+   * value by value (`restoreJsonValue`; keys are not restored). Default
+   * `false`: input stays tokenized. Restored input carries real PII into your
+   * tool code, and a model can still put a real token in the wrong field, so
+   * validate it before acting on it.
+   */
+  restoreToolArguments?: boolean;
+}
+
+interface RestoreMode {
+  /** The request asked for JSON output, so text blocks are JSON documents. */
+  jsonContent: boolean;
+  toolArguments: boolean;
 }
 
 interface MessagesLike {
@@ -51,7 +71,11 @@ export function wrapAnthropic<C extends AnthropicLike>(client: C, opts: WrapAnth
     const [request, ...rest] = args;
     const redactedRequest = request ? redactRequest(request, redactOpts) : request;
     const response = await originalCreate(redactedRequest, ...rest);
-    return restore ? restoreResponse(response, opts.vault) : response;
+    if (!restore) return response;
+    return restoreResponse(response, opts.vault, {
+      jsonContent: requestsJsonOutput(request),
+      toolArguments: opts.restoreToolArguments ?? false,
+    });
   } as typeof client.messages.create;
 
   return client;
@@ -94,7 +118,24 @@ function redactBlock(block: unknown, opts: RedactSyncOptions): unknown {
   return block;
 }
 
-function restoreResponse(res: unknown, vault: Vault): unknown {
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function requestsJsonOutput(req: unknown): boolean {
+  if (!isRecord(req)) return false;
+  const config = req.output_config;
+  return (
+    isJsonSchemaFormat(isRecord(config) ? config.format : undefined) ||
+    isJsonSchemaFormat(req.output_format)
+  );
+}
+
+function isJsonSchemaFormat(format: unknown): boolean {
+  return isRecord(format) && format.type === 'json_schema';
+}
+
+function restoreResponse(res: unknown, vault: Vault, mode: RestoreMode): unknown {
   if (!res || typeof res !== 'object') return res;
   const r = res as Record<string, unknown>;
   if (!Array.isArray(r.content)) return res;
@@ -104,7 +145,14 @@ function restoreResponse(res: unknown, vault: Vault): unknown {
       if (block && typeof block === 'object') {
         const b = block as Record<string, unknown>;
         if (b.type === 'text' && typeof b.text === 'string') {
-          return { ...b, text: restoreInPlace(b.text, vault) };
+          const text = mode.jsonContent
+            ? (restoreJsonDocument(b.text, (value) => restoreInPlace(value, vault)) ?? b.text)
+            : restoreInPlace(b.text, vault);
+          return { ...b, text };
+        }
+        if (mode.toolArguments && b.type === 'tool_use' && isRecord(b.input)) {
+          // `input` is the parsed JSON the SDK returned.
+          return { ...b, input: restoreJsonValue(b.input as JsonValue, { vault }) };
         }
       }
       return block;

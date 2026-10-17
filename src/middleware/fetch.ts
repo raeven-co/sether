@@ -2,7 +2,8 @@ import { Readable } from 'node:stream';
 import type { Detector } from '../detectors/types.js';
 import type { Vault } from '../vault/types.js';
 import { createRedactStream } from '../stream/redact.js';
-import { createRestoreStream } from '../stream/restore.js';
+import { restoreJsonDocument, restoreSync, type RestoreString } from '../stream/restore.js';
+import { restoreSSEText } from '../stream/sse.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  fetch wrapper
@@ -29,6 +30,11 @@ import { createRestoreStream } from '../stream/restore.js';
 //      body: JSON.stringify({ model: 'gpt-4', messages: [...] }),
 //    });
 //    const data = await response.text();   // PII restored
+//
+//  JSON is never restored as text: a body that parses as JSON is restored
+//  value by value, a JSON-typed body that doesn't (NDJSON) line by line, with
+//  lines that are not valid JSON left tokenized, and an event-stream body per
+//  `data:` payload. Other text bodies are restored as text.
 //
 //  Out of scope (deliberately):
 //   - Binary bodies (Blob / FormData / ArrayBuffer) — passed through unmodified
@@ -67,7 +73,7 @@ async function redactRequestBody(init: RequestInit, opts: WrapFetchOptions): Pro
   if (init.body === null || init.body === undefined) return init;
   if (typeof init.body !== 'string') return init; // pass through Blob/FormData/etc
 
-  const redacted = await streamRoundTrip(init.body, opts, 'redact');
+  const redacted = await redactText(init.body, opts);
   return { ...init, body: redacted };
 }
 
@@ -83,7 +89,7 @@ async function wrapResponse(response: Response, opts: WrapFetchOptions): Promise
 
   // Read the body once, restore, and rebuild a Response.
   const original = await response.text();
-  const restored = await streamRoundTrip(original, opts, 'restore');
+  const restored = restoreBody(original, contentType, opts.vault);
 
   // Restoration changes the body length, and reading it via `.text()` has
   // already decoded any transfer/content encoding. Carrying the upstream
@@ -102,19 +108,29 @@ async function wrapResponse(response: Response, opts: WrapFetchOptions): Promise
   });
 }
 
-async function streamRoundTrip(
-  text: string,
-  opts: WrapFetchOptions,
-  mode: 'redact' | 'restore',
-): Promise<string> {
-  const transform =
-    mode === 'redact'
-      ? createRedactStream({
-          detectors: opts.detectors,
-          vault: opts.vault,
-          safeDistanceBytes: opts.safeDistanceBytes,
-        })
-      : createRestoreStream({ vault: opts.vault });
+// Restore a complete textual body without splicing an original unescaped
+// into JSON.
+function restoreBody(body: string, contentType: string, vault: Vault): string {
+  const restoreString: RestoreString = (text) => restoreSync(text, { vault });
+  if (contentType.includes('event-stream')) return restoreSSEText(body, restoreString);
+  const document = restoreJsonDocument(body, restoreString);
+  if (document !== undefined) return document;
+  if (!contentType.includes('json')) return restoreString(body);
+  // A JSON type that is not one document: NDJSON / JSON Lines. A line that is
+  // not valid JSON stays tokenized rather than being restored as text, so an
+  // original cannot complete a truncated document into a different one.
+  return body
+    .split('\n')
+    .map((line) => restoreJsonDocument(line, restoreString) ?? line)
+    .join('\n');
+}
+
+async function redactText(text: string, opts: WrapFetchOptions): Promise<string> {
+  const transform = createRedactStream({
+    detectors: opts.detectors,
+    vault: opts.vault,
+    safeDistanceBytes: opts.safeDistanceBytes,
+  });
 
   return new Promise<string>((resolve, reject) => {
     let out = '';
