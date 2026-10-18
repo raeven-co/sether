@@ -21,13 +21,15 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
           cache: npm
 
-      # Trusted publishing needs npm 11.5.1 or later; Node 22 ships npm 10.
-      - run: npm install -g npm@^11.5.1
+      # Staged publishing needs npm 11.15.0 or later; Node 22 ships npm 10.
+      - run: npm install -g npm@^11.15.0
 
       - run: npm ci
 
       # Authenticates with npm trusted publishing (npmjs.com -> package settings ->
-      # Trusted Publisher: raeven-co/sether, workflow publish.yml). No stored token.
-      # prepublishOnly runs: typecheck + lint + check:regex + test + build
-      - name: Publish to npm
-        run: npm publish --provenance --access public
+      # Trusted Publisher: raeven-co/sether, workflow publish.yml, stage publish only).
+      # No stored token. The version goes live only after a maintainer approves it
+      # with 2FA: npmjs.com -> Staged Packages, or `npm stage approve <stage-id>`.
+      # prepublishOnly runs first: typecheck + lint + check:regex + test + build + check:ascii
+      - name: Stage release on npm
+        run: npm stage publish --provenance --access public
