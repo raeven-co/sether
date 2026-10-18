@@ -1,45 +1,133 @@
+<p align="center">
+  <img src="https://raw.githubusercontent.com/raeven-co/sether/main/assets/readme/sether-hero.webp" width="840" alt="Animated illustration: Sether spots an email address in a draft, masks it, swaps it for a realistic decoy, then restores the original when the reply comes back.">
+</p>
+
 # Sether
 
-> **Hide personal data from your AI before it reaches any LLM provider.**
->
-> Named for the Hebrew *sether* (סֵתֶר) — *the hiding place*. Psalm 32:7.
+**Keep the context. Protect the details.**
 
-Sether is a streaming PII-redaction layer that sits between your application
-and any LLM API. It detects sensitive data (email, phone, SSN, credit-card,
-IBAN, IP addresses), swaps each match for a stable token before the request
-leaves your boundary, then restores the original values transparently in
-the response.
+Your AI can help write the email. It doesn't need your actual email address.
 
-![Sether redacts PII locally before it reaches the LLM: the input "Hi, this is Amara Okafor — my account email is amara.okafor@acme.com … card 4242 4242 4242 4242 … call me at +1 (415) 555-2671 … SSN 123-45-6789" becomes "Hi, this is &lt;NAME&gt; — my account email is &lt;EMAIL&gt; … card &lt;CC&gt; … &lt;PHONE&gt; … &lt;SSN&gt;". The token vault stays in your infrastructure and restore() swaps the originals back into the reply.](https://raw.githubusercontent.com/raeven-co/sether/main/assets/sether-redaction.png)
+Sether is a small, deterministic engine for the boundary between your app and
+any model. It finds personal data and secrets in text and swaps them for tokens
+or realistic decoys before the text leaves your process. When the reply comes
+back, it puts the originals back. It's streaming-safe and JSON-safe, the vault
+stays on your side, and the library makes no network calls of its own.
 
-*Your app → **Sether** redacts locally → LLM. The token vault stays in your infrastructure; `restore()` swaps the originals back into the reply.*
+```bash
+npm install @raeven-co/sether
+```
 
-Three lines of TypeScript to wire it up. Works with **OpenAI, Anthropic,
-Cohere, Mistral, Google Gemini, AWS Bedrock, Azure OpenAI, Together,
-Groq, Ollama**, your own fine-tunes — anything that speaks HTTP and
-streams text. Sether doesn't care who's on the other end; it operates on
-the text stream.
+[Live sandbox](https://sether.raevenmarket.com.ng/sandbox) · [Docs](https://sether.raevenmarket.com.ng/docs) · [Python package](https://pypi.org/project/sether/) · [Changelog](./CHANGELOG.md) · MIT
 
-**Status:** `0.5.7` — browser-safe `@raeven-co/sether/browser` entry, opt-in identity pack with multilingual labels (names, DOB, passport, address), secrets pack, SSE/JSON-stream mode, audit events, and drop-in middlewares for Express / fetch / OpenAI / Anthropic.
-A product of **[Raeven Company LTD](https://admin.raevenmarket.com.ng)**
+> Named for the Hebrew *sether* (סֵתֶר), "the hiding place" (Psalm 32:7).
+> The name is also the spec.
 
 ---
 
-## Why this exists
+## Why this exists, and why now
 
-If your application sends a customer's email, phone number, or any other
-PII to an LLM provider, that's a sub-processor disclosure under
-[GDPR Article 28](https://gdpr-info.eu/art-28-gdpr/). Credit-card data
-pulls you into PCI DSS scope. Health identifiers trigger HIPAA. The first
-GDPR enforcement actions tied to AI flows landed in 2025, and the EU AI
-Act phases in through 2026–2027.
+**AI got useful by reading the real thing.** Support tickets, logs, CRM rows,
+contracts. People paste the whole thing because they want a good answer. The
+task needs help. The details hitch a ride.
 
-Sether stops the leak at the boundary: sensitive substrings become stable
-tokens before the bytes leave your process, and `restore()` swaps them back
-so your application code does not need to branch on redacted text.
-Automated per-event regulation tagging and SIEM export are on the **Pro /
-hosted roadmap** (see *What's coming* below) — the npm library focuses on
-deterministic streaming redaction today.
+- 77% of employees who use GenAI paste data into it, and 22% of those pastes
+  contain personal or payment-card data
+  ([LayerX report, via The Register, Oct 2025](https://www.theregister.com/software/2025/10/07/employees-regularly-paste-company-secrets-into-chatgpt/1274532)).
+- Harmonic Security counted 579,113 sensitive-data exposures across 22.5 million
+  enterprise AI prompts and uploads in 2025
+  ([Harmonic, Jan 2026](https://www.harmonic.security/resources/what-22-million-enterprise-ai-prompts-reveal-about-shadow-ai-in-2025)).
+- 92% of organisations that had an AI-related security incident lacked proper AI
+  access controls
+  ([IBM Cost of a Data Breach 2026](https://newsroom.ibm.com/2026-07-29-ibm-study-one-in-four-malicious-breaches-are-ai-enabled,-costing-companies-6-million-on-average)).
+
+**Agents raised the stakes.** A chatbot reads your data. An agent acts on it: it
+updates the CRM, sends the email, files the ticket. The tool needs the real
+address back, so one-way masking breaks the workflow, and a workflow that breaks
+tends to get switched off. Hiding the value is the easy half. Giving it back
+safely is the hard half. We learned that one the honest way: 0.8.0 fixed our
+own restore path, where a value restored into tool-call JSON as plain text could
+add a `bcc` recipient.
+
+**The rules already apply.**
+
+- An LLM API provider typically acts as your processor, and
+  [GDPR Article 28](https://gdpr-info.eu/art-28-gdpr/) expects processors that
+  give sufficient guarantees, bound by a contract.
+- OWASP lists
+  [LLM02:2025 Sensitive Information Disclosure](https://genai.owasp.org/llmrisk/llm022025-sensitive-information-disclosure/)
+  in its Top 10 for LLM applications.
+- In Nigeria, the NDPC fined MultiChoice ₦766.2 million in July 2025, citing
+  privacy breaches and unlawful cross-border transfers of personal data
+  ([ICIR](https://www.icirnigeria.org/ndpc-fines-multichoice-nigeria-%E2%82%A6766-million-over-data-privacy-violations/)).
+
+**Detection is becoming free, and that's good news.**
+
+- [LangChain's PIIMiddleware](https://docs.langchain.com/oss/python/langchain/guardrails) can redact, mask, hash or block.
+- [n8n's Guardrails node](https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-langchain.guardrails/) swaps PII for placeholders.
+- OpenAI released an open-weight [Privacy Filter](https://huggingface.co/openai/privacy-filter) (Apache-2.0) in April 2026.
+- [Presidio](https://github.com/data-privacy-stack/presidio), originally Microsoft's and now community-maintained, is a mature detector.
+
+Sether focuses on the part around detection: deterministic, streaming-safe
+replacement, a vault you own, and a restore that can't rewrite your JSON. If you
+prefer another detector, plug it in through the `Detector` interface.
+
+---
+
+## How the engine works
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/raeven-co/sether/main/assets/readme/sether-round-trip.webp" width="840" alt="Animated diagram of the SDK round trip: your application's text goes through Sether, which swaps the email for a token or decoy and keeps the mapping in your vault; the model works with the placeholder; the reply comes back through Sether and the original email is restored.">
+</p>
+
+A stand-in goes out. The original comes back. Four steps, all in your process:
+
+| Step | What happens | The detail that matters |
+| --- | --- | --- |
+| **1. Detect** | Detector packs scan the text: emails, phones, cards, SSNs, IPs, IBANs by default; secrets and labelled identity fields when you opt in. | Every detector is deterministic (pattern plus validator: Luhn, mod-97, libphonenumber, SSA rules). The same input gives the same output, and every regex is ReDoS-checked in CI. |
+| **2. Replace** | Each match becomes a typed token such as `<EMAIL_9f1c…>`, or a realistic decoy from an `AliasVault`. | The original goes into **your** vault (in-memory LRU by default: 10,000 entries, 1-hour TTL). It never goes into the token or an audit event. |
+| **3. Stream** | Redaction runs as a streaming transform, so token-by-token LLM traffic works. | The stream holds back a 256-byte tail (and long secrets up to 8 KB), so a value split across two chunks is still caught. Property-based tests split text at random boundaries and check the round trip. |
+| **4. Restore** | Tokens or decoys in the reply are swapped back for the originals. | For JSON (tool calls, JSON mode), `restoreJson` restores value by value and never touches keys. `strict: true` refuses tokens the vault never issued. |
+
+```text
+your app ──► detect ──► replace ──► model sees <EMAIL_9f1c…>
+   ▲                       │
+   │                 your vault (originals)
+   │                       │
+   └──── restore ◄─────────┴──── reply mentions <EMAIL_9f1c…>
+```
+
+## What Sether is, and isn't
+
+- **It is a boundary, not a model.** No ML runs on the hot path, so results are
+  reproducible and testable. For free-text names, pair it with
+  [`@raeven-co/sether-ner`](https://www.npmjs.com/package/@raeven-co/sether-ner)
+  or your own NER.
+- **It keeps your context.** The model still gets the task, the structure and a
+  stand-in it can reason about. "Draft a welcome email to `<EMAIL_1>`" is still
+  a perfectly good prompt.
+- **It is inspectable.** MIT, about 60 KB per build, one runtime dependency
+  (`libphonenumber-js`), and npm provenance on CI releases. Read it, fork it, audit it.
+- **It is honest about misses.** Detection is pattern-based. It will miss
+  things it has no pattern for, and dense numbers can trip the card check.
+  Review both kinds of error on your own data. [Honest limitations](#honest-limitations) lists the known ones.
+- **It isn't a compliance certificate.** It's a technical control you can point
+  to, and a record of what it replaced. What you claim to a regulator is still
+  your call.
+
+### The Sether family
+
+The same engine runs in five places:
+
+| Where | What |
+| --- | --- |
+| Your TypeScript app | This package, `@raeven-co/sether` |
+| Your Python app | [`sether` on PyPI](https://pypi.org/project/sether/): sync and async streaming, plus httpx, ASGI, WSGI, OpenAI and Anthropic integrations |
+| Your browser | [Sether Shield for Chrome](https://chromewebstore.google.com/detail/keknopdmmjbljjjkmmpmkblldeapdjne): detection, masks and restore in AI chat boxes, all local. Decoys, watchlists and custom rules are in Pro. |
+| Your editor | [Sether for VS Code](https://marketplace.visualstudio.com/items?itemName=GodfreyLebo.sether): scan, Copy Scrubbed, Paste with Originals Restored |
+| Your agent's tool calls | [Gateway Guard](https://github.com/raeven-co/sether-gateway-guard) (beta, self-hosted): an OpenAI-compatible hop that refuses tool calls whose tokens weren't issued in that run |
+
+The animation at the top shows Sether Shield. It's an illustration with fictional data.
 
 ---
 
@@ -312,9 +400,10 @@ const sether = new Sether({
 | `addressDetector` (`ADDRESS`) | Label anchor, street-suffix structure, UK postcode | Labelled address lines, `<number> <words> <Street/Ave/Rd…>`, and UK postcodes. |
 
 **Coverage note:** the identity pack is strongest on *labelled* and
-*structured* PII (forms, KYC, RAG documents, support tickets). Free-text
-NER for unlabelled names / organisations / locations is on the roadmap as
-the separate `@raeven-co/sether-ner` package.
+*structured* PII (forms, KYC, RAG documents, support tickets). For
+unlabelled names, organisations and locations in free text, there's the
+separate, early [`@raeven-co/sether-ner`](https://www.npmjs.com/package/@raeven-co/sether-ner)
+package. It uses a lazy-loaded ONNX model, so the core install stays small.
 
 All detectors implement the `Detector` interface — you can write your own
 and pass it via the `detectors` option.
@@ -446,19 +535,18 @@ Known limitations in this release:
 
 ---
 
-## What's new in 0.3.0
+## What's new in 0.8
 
-The headline of this release is the **opt-in identity detector pack** —
-label-anchored detection for names, dates of birth, passport numbers, and
-addresses (documented under [Identity pack](#identity-pack-opt-in--new-in-030)
-above). It is **not** part of `basicDetectors`, so `new Sether()` behaves
-exactly as it did in 0.2.x — existing installs are unaffected unless they
-opt in.
+0.8.0 was a security release. Restoring tokens into **serialized JSON** as text
+let an original like `Alice", "bcc": "attacker@example.com` add a key to a tool
+call. It's a terrible name and an excellent test case. 0.8 adds:
 
-This release also makes `wrapFetch`'s `fetchImpl` **required** — it no longer
-falls back to `globalThis.fetch`. That's a small breaking change for anyone
-who relied on the implicit fallback; the one-line migration is to pass
-`fetchImpl: fetch`. Full notes in the [CHANGELOG](./CHANGELOG.md).
+- `restoreJson` / `restoreJsonValue`, which restore value by value and never restore keys
+- `strict: true`, which refuses invented, expired, case-altered or foreign tokens
+- JSON-aware restore inside Sether's own SSE, fetch, Express and SDK-wrapper paths
+- a fix for the Express middleware keeping a client-sent `"__proto__"` key as the prototype
+
+0.8.1 changes documentation only. Full notes are in the [CHANGELOG](./CHANGELOG.md).
 
 ---
 
@@ -576,7 +664,7 @@ Every redaction can emit a structured `AuditEvent` that maps to the regulation i
 import { ConsoleAuditSink, MemoryAuditSink, DEFAULT_REGULATION_MAPPINGS } from '@raeven-co/sether';
 ```
 
-`ConsoleAuditSink` writes JSONL to stderr. `MemoryAuditSink` accumulates events for tests and the browser sandbox. **The original value is never carried in an event — only its length.** Persistence (Postgres / D1 / SIEM export) lives in the hosted Pro tier; the schema is the same on both sides so promoting from local-only to hosted doesn't reshape events.
+`ConsoleAuditSink` writes JSONL to stderr. `MemoryAuditSink` accumulates events for tests and the browser sandbox. **The original value is never carried in an event — only its length.** Persistence and SIEM export are planned for the hosted gateway (early access, separate from the library). It will use the same event schema, so moving from local-only to hosted won't reshape your events.
 
 ### `redactSync(text, { detectors, vault })` / `restoreSync(text, { vault })`
 
@@ -596,13 +684,15 @@ Use `createRedactStream` / `createRestoreStream` for input that may span chunk b
 
 ---
 
-## What's coming (next / Pro hosted tier)
+## What's coming
 
-- **Free-text NER detectors** — unlabelled names, organisations, and locations in running prose. Ships as a separate `@raeven-co/sether-ner` package to keep the core install lean (avoids the ~30 MB native ONNX runtime). The 0.3.0 identity pack already covers these entities when they are *labelled*; NER extends them to free text.
-- **Vault adapters as reference examples** — Redis and Postgres patterns documented in the repo, not bundled (the `Vault` interface already supports BYO).
-- **Compliance reports** mapped to SOC 2 / GDPR / HIPAA controls — Pro hosted tier.
-- **Audit log persistence + SIEM export** — Pro hosted tier.
-- **Benchmarks vs Microsoft Presidio** — alongside the `sether-ner` release.
+- **Free-text NER, maturing.** [`@raeven-co/sether-ner`](https://www.npmjs.com/package/@raeven-co/sether-ner) is out as an early release, kept separate so the core install never carries an ONNX runtime. The identity pack already covers names, DOB, passports and addresses when they're *labelled*; NER extends that to free text.
+- **Vault adapters as reference examples.** Redis and Postgres patterns documented in the repo, not bundled. The `Vault` interface already supports bring-your-own.
+- **Compliance reports** mapped to SOC 2 / GDPR / HIPAA controls. Planned for the hosted gateway.
+- **Audit-log persistence and SIEM export.** Planned for the hosted gateway, which is in early access.
+- **Benchmarks against Microsoft Presidio**, alongside a stable `sether-ner`.
+
+The library stays MIT and complete. None of these will take a feature away from it.
 
 Track progress: <https://github.com/raeven-co/sether>
 
@@ -619,7 +709,7 @@ Track progress: <https://github.com/raeven-co/sether>
 - [x] JSON-stream mode for SSE / JSON LLM streams
 - [x] Drop-in middlewares (Express, fetch, OpenAI SDK, Anthropic SDK)
 - [x] Detector pack: identity (label-anchored name / DOB / passport / address)
-- [ ] Detector pack: ONNX-based NER for free-text names / orgs / locations (`@raeven-co/sether-ner`)
+- [ ] Detector pack: ONNX-based NER for free-text names / orgs / locations (`@raeven-co/sether-ner`, early release out)
 - [ ] Pluggable vault adapters (Redis, Postgres)
 - [ ] Benchmarks vs Microsoft Presidio (committed in repo)
 - [ ] Migration guide from `redact-ai-stream` 1.x
@@ -639,7 +729,11 @@ Email `emorylebo@gmail.com`.
 ## Links
 
 - **Live sandbox:** <https://sether.raevenmarket.com.ng/sandbox>
+- **Docs:** <https://sether.raevenmarket.com.ng/docs>
 - **GitHub:** <https://github.com/raeven-co/sether>
 - **npm:** <https://www.npmjs.com/package/@raeven-co/sether>
 - **PyPI (Python port):** <https://pypi.org/project/sether/> · [docs](https://sether.raevenmarket.com.ng/docs/python)
+- **Sether Shield (Chrome):** <https://chromewebstore.google.com/detail/keknopdmmjbljjjkmmpmkblldeapdjne>
+- **Sether for VS Code:** <https://marketplace.visualstudio.com/items?itemName=GodfreyLebo.sether>
+- **Gateway Guard (beta, self-host):** <https://github.com/raeven-co/sether-gateway-guard>
 - **Issues:** <https://github.com/raeven-co/sether/issues>

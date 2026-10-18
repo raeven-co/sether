@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.8.1 — 2026-10-18
+
+Documentation only. No code changes; the published API and behaviour are identical to 0.8.0.
+
+- **README rewritten.** It now has:
+  - animated illustrations of the engine (hosted in `assets/readme/`, not shipped in the package)
+  - a "why this exists, and why now" section, where every figure links to its source
+  - a four-step explanation of how the engine works, and the Sether family of tools
+- **Stale claims corrected:**
+  - the old "Status: 0.5.7" line is gone
+  - `@raeven-co/sether-ner` is described as published (early), not as a roadmap item
+  - audit persistence, SIEM export and compliance reports are described as planned for the hosted gateway, not a "Pro hosted tier"
+- **Release process.** Releases go through npm trusted publishing with staged approval: CI stages the version and a maintainer approves it with 2FA. No publish token is stored. 0.8.0 was the first release published this way.
+
+### Build & test surface
+
+- Tests: **252 passing** across 17 files (unchanged from 0.8.0)
+- ReDoS scan: 0 unsafe (224 patterns); typecheck, lint and ASCII-dist clean
+- Build: `dist/index.js` 61.6 KB, `dist/index.cjs` 63.0 KB; tarball unchanged at 18 files
+- Checked locally on Node 24. The CI matrix covers Node 20, 22 and 24.
+
 ## 0.8.0 — 2026-10-17
 
 Security fix. Also carries 0.7.1 (docs only), which was tagged but never
